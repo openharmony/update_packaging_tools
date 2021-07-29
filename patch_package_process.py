@@ -260,6 +260,8 @@ class PatchProcess:
         try:
             patch_value, do_pkg_diff = self.apply_compute_patch(
                 src_file_obj.name, tgt_file_obj.name, do_pkg_diff)
+            src_file_obj.close()
+            tgt_file_obj.close()
         except ValueError:
             UPDATE_LOGGER.print_log("Patch process Failed!")
             UPDATE_LOGGER.print_log("%7s %s %s (from %s %s)" % (

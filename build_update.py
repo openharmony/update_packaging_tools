@@ -39,7 +39,6 @@ optional arguments:
                         Private key file path.
 
 """
-import copy
 import filecmp
 import os
 import argparse
@@ -462,7 +461,7 @@ def increment_image_processing(
 
         graph_process = GigraphProcess(actions_list, src_sparse_image,
                                        tgt_sparse_image)
-        actions_list = copy.deepcopy(graph_process.actions_list)
+        actions_list = graph_process.actions_list
         patch_process = PatchProcess(each_img, tgt_sparse_image,
                                      src_sparse_image,
                                      actions_list)
