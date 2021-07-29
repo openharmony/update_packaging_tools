@@ -30,13 +30,14 @@ from ctypes import cdll
 from cryptography.hazmat.primitives import hashes
 from log_exception import UPDATE_LOGGER
 
-operation_path = os.getcwd()
+operation_path = os.path.dirname(os.path.realpath(__file__))
 PRODUCT = 'hi3516'
 BUILD_TOOLS_FILE_NAME = 'build_tools.zip'
 UPDATE_EXE_FILE_NAME = "updater_binary"
 
 SCRIPT_KEY_LIST = ['prelude', 'verse', 'refrain', 'ending']
 TOTAL_SCRIPT_FILE_NAME = "loadScript.us"
+REGISTER_SCRIPT_FILE_NAME = "registerCmd.us"
 SCRIPT_FILE_NAME = '-script.us'
 
 UPDATER_CONFIG = "updater_config"
@@ -64,6 +65,7 @@ CHUNK_TYPE_CRC32 = 0xCAC4
 
 HASH_ALGORITHM_DICT = {'sha256': hashes.SHA256, 'sha384': hashes.SHA384}
 LINUX_HASH_ALGORITHM_DICT = {'sha256': 'sha256sum', 'sha384': 'sha384sum'}
+HASH_CONTENT_LEN_DICT = {'sha256': 64, 'sha384': 96}
 
 COMPONENT_INFO_INNIT = ['', '000', '00', '0', '0o00']
 
@@ -159,6 +161,8 @@ class OptionsManager:
         for each in SCRIPT_KEY_LIST:
             self.opera_script_file_name_dict[each] = []
         self.total_script_file_obj = None
+
+        self.register_script_file_obj = None
 
         # Update package parameters
         self.update_bin_obj = None
@@ -404,6 +408,8 @@ def clear_options():
         OPTIONS_MANAGER.opera_script_file_name_dict[each] = []
     OPTIONS_MANAGER.total_script_file_obj = None
 
+    OPTIONS_MANAGER.register_script_file_obj = None
+
     # Update package parameters
     OPTIONS_MANAGER.update_bin_obj = None
     OPTIONS_MANAGER.build_tools_zip_obj = None
@@ -436,6 +442,10 @@ def clear_resource(err_clear=False):
     total_script_file_obj = OPTIONS_MANAGER.total_script_file_obj
     if total_script_file_obj is not None:
         total_script_file_obj.close()
+
+    register_script_file_obj = OPTIONS_MANAGER.register_script_file_obj
+    if register_script_file_obj is not None:
+        register_script_file_obj.close()
 
     full_image_file_obj_list = OPTIONS_MANAGER.full_image_file_obj_list
     if len(full_image_file_obj_list) != 0:

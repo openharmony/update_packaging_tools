@@ -153,7 +153,7 @@ class PatchProcess:
                     stashed_blocks, tgt_size, total_blocks_count,
                     transfer_content)
         else:
-            do_img_diff, patch_value = self.compute_diff_patch(
+            do_pkg_diff, patch_value = self.compute_diff_patch(
                 each_action, patch_dat_file_obj)
 
             if each_action.src_block_set.is_overlaps(
@@ -163,7 +163,7 @@ class PatchProcess:
                 if temp_stash_usage > max_stashed_blocks:
                     max_stashed_blocks = temp_stash_usage
 
-            self.add_diff_command(diff_offset, do_img_diff,
+            self.add_diff_command(diff_offset, do_pkg_diff,
                                   each_action, patch_value, src_str,
                                   transfer_content)
 
@@ -224,11 +224,11 @@ class PatchProcess:
         """
         Add the diff command.
         """
-        diff_offset, do_img_diff, each_action,\
+        diff_offset, do_pkg_diff, each_action,\
             patch_value, src_str, transfer_content = args
         self.touched_src_ranges = self.touched_src_ranges.get_union_with_other(
             each_action.src_block_set)
-        diff_type = "imgdiff" if do_img_diff else "bsdiff"
+        diff_type = "pkgdiff" if do_pkg_diff else "bsdiff"
         transfer_content.append("%s %d %d %s %s %s %s\n" % (
             diff_type,
             diff_offset, len(patch_value),
@@ -254,12 +254,12 @@ class PatchProcess:
             src_file_obj)
         OPTIONS_MANAGER.incremental_temp_file_obj_list.append(
             tgt_file_obj)
-        do_img_diff = True if \
+        do_pkg_diff = True if \
             each_action.tgt_name.split(".")[-1].lower() in \
             ("zip", "gz", "lz4", "hap") else False
         try:
-            patch_value, do_img_diff = self.apply_compute_patch(
-                src_file_obj.name, tgt_file_obj.name, do_img_diff)
+            patch_value, do_pkg_diff = self.apply_compute_patch(
+                src_file_obj.name, tgt_file_obj.name, do_pkg_diff)
         except ValueError:
             UPDATE_LOGGER.print_log("Patch process Failed!")
             UPDATE_LOGGER.print_log("%7s %s %s (from %s %s)" % (
@@ -270,7 +270,7 @@ class PatchProcess:
                                     UPDATE_LOGGER.ERROR_LOG)
             raise ValueError
         patch_dat_file_obj.write(patch_value)
-        return do_img_diff, patch_value
+        return do_pkg_diff, patch_value
 
     def add_move_command(self, *args):
         """
@@ -466,12 +466,12 @@ class PatchProcess:
         return total
 
     @staticmethod
-    def apply_compute_patch(src_file, tgt_file, imgdiff=False):
+    def apply_compute_patch(src_file, tgt_file, pkgdiff=False):
         """
         Add command content to the script.
         :param src_file: source file name
         :param tgt_file: target file name
-        :param imgdiff: whether to execute imgdiff judgment
+        :param pkgdiff: whether to execute pkgdiff judgment
         :return:
         """
         patch_file_obj = \
@@ -479,19 +479,21 @@ class PatchProcess:
 
         OPTIONS_MANAGER.incremental_temp_file_obj_list.append(
             patch_file_obj)
-        cmd = [DIFF_EXE_PATH] if imgdiff else [DIFF_EXE_PATH, '-b', '1']
+        cmd = [DIFF_EXE_PATH] if pkgdiff else [DIFF_EXE_PATH, '-b', '1']
 
         cmd.extend(['-s', src_file, '-d', tgt_file, '-p', patch_file_obj.name])
         sub_p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                  stderr=subprocess.STDOUT)
         output, _ = sub_p.communicate()
+        sub_p.wait()
+        patch_file_obj.seek(0)
 
         if sub_p.returncode != 0:
             raise ValueError(output)
 
         with open(patch_file_obj.name, 'rb') as file_read:
             patch_content = file_read.read()
-        return patch_content, imgdiff
+        return patch_content, pkgdiff
 
 
 class PackagePatchZip:
