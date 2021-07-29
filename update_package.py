@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import binascii
 import copy
 import os
 import subprocess
@@ -28,7 +29,9 @@ from enum import Enum
 
 from log_exception import UPDATE_LOGGER
 from script_generator import create_script
+from utils import HASH_CONTENT_LEN_DICT
 from utils import OPTIONS_MANAGER
+from utils import REGISTER_SCRIPT_FILE_NAME
 from utils import ON_SERVER
 from utils import SCRIPT_KEY_LIST
 from utils import EXTEND_OPTIONAL_COMPONENT_LIST
@@ -57,7 +60,8 @@ class PkgHeader(Structure):
                 ("product_update_id", c_char_p),
                 ("software_version", c_char_p),
                 ("date", c_char_p),
-                ("time", c_char_p)]
+                ("time", c_char_p),
+                ("describe_package_id", c_char_p)]
 
 
 class PkgComponent(Structure):
@@ -160,16 +164,19 @@ def get_component_list(all_image_file_obj_list, component_dict):
             component = copy.copy(COMPONENT_INFO_INNIT)
             component[0] = key
         component_list[idx].digest = (c_ubyte * 32).from_buffer_copy(
-            digest.encode('utf-8'))
+            binascii.a2b_hex(digest.encode('utf-8')))
         component_list[idx].file_path = file_path.encode("utf-8")
         component_list[idx].component_addr = \
             ('/%s' % component[0]).encode("utf-8")
         component_list[idx].version = component[4].encode("utf-8")
-        component_list[idx].size = 0
-        component_list[idx].transfer_id = int(component[1])
-        component_list[idx].original_size = os.path.getsize(file_path)
+        component_list[idx].size = os.path.getsize(file_path)
+        component_list[idx].id = int(component[1])
+        if component[3] == 1:
+            component_list[idx].original_size = os.path.getsize(file_path)
+        else:
+            component_list[idx].original_size = 0
         component_list[idx].res_type = int(component[2])
-        component_list[idx].type_str = int(component[3])
+        component_list[idx].type = int(component[3])
         component_list[idx].flags = IS_DEL
         idx += 1
     return component_list
@@ -197,16 +204,17 @@ def get_head_list(component_count, head_value_list):
     head_list.software_version = head_value_list[2].encode("utf-8")
     head_list.date = head_value_list[3].encode("utf-8")
     head_list.time = head_value_list[4].encode("utf-8")
+    head_list.describe_package_id = c_char_p("update/info.bin".encode())
     return head_list
 
 
 def get_tools_component_list(count, opera_script_dict):
     """
-    Get the list of component information according to 
+    Get the list of component information according to
     the component information structure.
     :param count: number of components
     :param opera_script_dict: script file name and path dict
-    :return component_list: list of component information. 
+    :return component_list: list of component information.
                             If exception occurs, return False.
     """
     pkg_components = PkgComponent * count
@@ -305,10 +313,16 @@ def create_build_tools_zip(lib):
         for each in each_value:
             opera_script_dict[each[1].name] = each[0]
             count += 1
-    head_list = get_tools_head_list(count + 2)
+    # other_file_count --> 1(updater_binary) + 1(loadScript.us)
+    other_file_count = 2
+    count += other_file_count
+    if OPTIONS_MANAGER.register_script_file_obj is not None:
+        count += 1
+    head_list = get_tools_head_list(count)
     component_list, num = \
-        get_tools_component_list(count + 2, opera_script_dict)
+        get_tools_component_list(count, opera_script_dict)
     total_script_file_obj = OPTIONS_MANAGER.total_script_file_obj
+    register_script_file_obj = OPTIONS_MANAGER.register_script_file_obj
     update_exe_path = os.path.join(OPTIONS_MANAGER.target_package_dir,
                                    UPDATE_EXE_FILE_NAME)
     if not os.path.exists(update_exe_path):
@@ -325,6 +339,13 @@ def create_build_tools_zip(lib):
         total_script_file_obj.name.encode("utf-8")
     component_list[num + 1].component_addr = \
         TOTAL_SCRIPT_FILE_NAME.encode("utf-8")
+
+    if OPTIONS_MANAGER.register_script_file_obj is not None:
+        component_list[num + 2].file_path = \
+            register_script_file_obj.name.encode("utf-8")
+        component_list[num + 2].component_addr = \
+            REGISTER_SCRIPT_FILE_NAME.encode("utf-8")
+
     lib.CreatePackage(
         pointer(head_list), component_list, file_save_patch,
         OPTIONS_MANAGER.private_key.encode("utf-8"))
@@ -429,12 +450,14 @@ def get_hash_content(file_path, hash_algorithm):
         raise RuntimeError
     process_obj = subprocess.Popen(
         cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    hash_content = ''
-    while process_obj.poll() is None:
-        line = process_obj.stdout.readline()
-        line = line.strip()
-        if line:
-            hash_content = line.decode(encoding='gbk').split(' ')[0]
+    process_obj.wait()
+    hash_content = \
+        process_obj.stdout.read().decode(encoding='gbk').split(' ')[0]
+    if len(hash_content) != HASH_CONTENT_LEN_DICT.get(hash_algorithm):
+        UPDATE_LOGGER.print_log(
+            "Get hash content failed! The length of the hash_content is 0!",
+            UPDATE_LOGGER.ERROR_LOG)
+        raise RuntimeError
     if process_obj.returncode == 0:
         UPDATE_LOGGER.print_log(
             "Get hash content success! path: %s" % file_path)

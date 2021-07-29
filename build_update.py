@@ -39,11 +39,9 @@ optional arguments:
                         Private key file path.
 
 """
-import copy
 import filecmp
 import os
 import argparse
-import re
 import subprocess
 
 import xmltodict
@@ -186,20 +184,18 @@ def create_entrance_args():
         partition_file, signing_algorithm, hash_algorithm, private_key
 
 
-def get_script_obj(script_obj=None):
+def get_script_obj():
     """
-    获取Opera script对象
+    Obtain Opera script object
     :return:
     """
     script_obj_list = create_vendor_script_class()
-    if script_obj_list == [None] * len(SCRIPT_KEY_LIST) and script_obj is None:
+    if script_obj_list == [None] * len(SCRIPT_KEY_LIST):
         prelude_script = PreludeScript()
         verse_script = VerseScript()
         refrain_script = RefrainScript()
         ending_script = EndingScript()
     else:
-        if script_obj_list == [None] * len(SCRIPT_KEY_LIST):
-            script_obj_list = script_obj
         UPDATE_LOGGER.print_log(
             "Get vendor extension object completed!"
             "The vendor extension script will be generated.")
@@ -465,7 +461,7 @@ def increment_image_processing(
 
         graph_process = GigraphProcess(actions_list, src_sparse_image,
                                        tgt_sparse_image)
-        actions_list = copy.deepcopy(graph_process.actions_list)
+        actions_list = graph_process.actions_list
         patch_process = PatchProcess(each_img, tgt_sparse_image,
                                      src_sparse_image,
                                      actions_list)
@@ -501,11 +497,14 @@ def check_patch_file(patch_process):
         diff_str = None
         diff_num = 0
         for line in f_t:
-            if 'new' in line:
-                num_list = line.split('\n')[0].split(',')
-                child_num = (int(num_list[-1]) - int(num_list[-2]))
-                num += child_num
-            if 'diff' in line:
+            if line.startswith('new '):
+                each_line_list = \
+                    line.strip().replace("new ", "").split(",")[1:]
+                for idx in range(0, len(each_line_list), 2):
+                    num += \
+                        int(each_line_list[idx + 1]) - int(each_line_list[idx])
+                continue
+            if line.startswith('bsdiff ') or line.startswith('pkgdiff '):
                 diff_str = line
         if diff_str:
             diff_list = diff_str.split('\n')[0].split(' ')

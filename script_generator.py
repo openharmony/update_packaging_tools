@@ -361,7 +361,7 @@ def create_script(prelude_script, verse_script,
     :param ending_script: ending script
     :return:
     """
-    # 生成序幕脚本
+    # Generate the prelude script.
     prelude_script.add_command("\n# ---- prelude ----\n")
 
     # Get the distribution progress.
@@ -402,7 +402,7 @@ def create_script(prelude_script, verse_script,
             ['    %s' % each for each in verse_script_content.split('\n')])
         verse_script_content = verse_script_content_list[0].replace(
             "ALL_WRITE_FLAG", verse_script_content)
-    # Generae the verse script.
+    # Generate the verse script.
     write_script(verse_script_content, 'verse')
     # Generate the refrain script.
     refrain_script.add_command("\n# ---- refrain ----\n")
