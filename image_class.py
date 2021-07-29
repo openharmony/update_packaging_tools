@@ -130,6 +130,7 @@ class SparseImage:
     """
     Sparse image class
     """
+
     def __init__(self, image_path, map_path):
         """
         Initialize the sparse image.
@@ -191,7 +192,7 @@ class SparseImage:
                 self.care_block_range.extend_value_to_blocks(EXTEND_VALUE)
             all_blocks = BlocksManager(range_data=(0, total_blocks))
             self.extended_range = \
-                extended_range.get_intersect_with_other(all_blocks).\
+                extended_range.get_intersect_with_other(all_blocks). \
                 get_subtract_with_other(self.care_block_range)
             self.parse_block_map_file(map_path, f_r)
 
@@ -201,7 +202,7 @@ class SparseImage:
         Parse the chunk information.
         :return pos_value: pos
         """
-        block_size, care_value_list, chunk_info, f_r,\
+        block_size, care_value_list, chunk_info, f_r, \
             offset_value_list, pos_value = args
         chunk_type = chunk_info[0]
         # Chunk quantity
@@ -276,7 +277,7 @@ class SparseImage:
                 each_range = BlocksManager(ranges_value)
                 temp_file_map[each_map_path] = each_range
                 # each_range is contained in the remain range.
-                if each_range.size() != each_range.\
+                if each_range.size() != each_range. \
                         get_intersect_with_other(remain_range).size():
                     raise RuntimeError
                 # After the processing is complete,
@@ -307,8 +308,8 @@ class SparseImage:
         """
         Implement traversal processing of remain_range.
         """
-        default_zero_block, image_file_r,\
-            nonzero_blocks_list, nonzero_groups_list,\
+        default_zero_block, image_file_r, \
+            nonzero_blocks_list, nonzero_groups_list, \
             remain_range, zero_blocks_list = args
         for start_value, end_value in remain_range:
             for each_value in range(start_value, end_value):
@@ -338,7 +339,7 @@ class SparseImage:
         zero_blocks_list zero block list
         :return temp_file_map file map
         """
-        nonzero_blocks_list, nonzero_groups_list,\
+        nonzero_blocks_list, nonzero_groups_list, \
             reserved_blocks, temp_file_map, zero_blocks_list = args
         if nonzero_blocks_list:
             nonzero_groups_list.append(nonzero_blocks_list)
@@ -367,8 +368,8 @@ class SparseImage:
         :return new_nonzero_blocks_list: new nonzero blocks list,
         :return new_nonzero_groups_list: new nonzero groups list.
         """
-        data, default_zero_block, each_value,\
-            nonzero_blocks_list, nonzero_groups_list,\
+        data, default_zero_block, each_value, \
+            nonzero_blocks_list, nonzero_groups_list, \
             zero_blocks_list = args
         # Check whether the data block is equal to the default zero_blocks.
         if data == default_zero_block:
@@ -383,8 +384,9 @@ class SparseImage:
                 nonzero_groups_list.append(nonzero_blocks_list)
                 nonzero_blocks_list = []
         new_zero_blocks_list, new_nonzero_blocks_list, \
-            new_nonzero_groups_list = copy.copy(zero_blocks_list), \
-            copy.copy(nonzero_blocks_list), \
+            new_nonzero_groups_list = \
+            copy.copy(zero_blocks_list), \
+            copy.copy(nonzero_blocks_list),\
             copy.copy(nonzero_groups_list)
         return new_zero_blocks_list, new_nonzero_blocks_list, \
             new_nonzero_groups_list
@@ -402,7 +404,7 @@ class SparseImage:
         image_file_r: read file object,
         :return data: Get the file data.
         """
-        block_size, chunk_start, default_zero_block, each_value,\
+        block_size, chunk_start, default_zero_block, each_value, \
             file_pos, fill_data, image_file_r = args
         if file_pos is not None:
             file_pos += (each_value - chunk_start) * block_size
@@ -511,3 +513,68 @@ class SparseImage:
             image_flag = False
         return block_size, chunk_header_info_size, header_info_size, \
             magic_info, total_blocks, total_chunks, image_flag
+
+
+class RawImage:
+    """
+    Image class for raw image file.
+    """
+
+    def __init__(self, path):
+        self.path = path
+        self.block_size = 4096
+        file_size = os.path.getsize(self.path)
+        self.__fd = open(self.path, 'rb')
+
+        if file_size % self.block_size != 0:
+            UPDATE_LOGGER.print_log(
+                "Size of file %s must be multiple of %d bytes!"
+                % (self.path, self.block_size), UPDATE_LOGGER.ERROR_LOG)
+            raise ValueError()
+
+        self.total_blocks = file_size // self.block_size
+        self.care_block_range = \
+            BlocksManager(range_data=(0, self.total_blocks))
+        self.clobbered_blocks = BlocksManager()
+        self.extended_range = BlocksManager()
+        zero_blocks = []
+        nonzero_blocks = []
+        reference = b'\0' * self.block_size
+        for i in range(self.total_blocks):
+            blocks_data = self.__fd.read(self.block_size)
+            if blocks_data == reference:
+                zero_blocks.append(i)
+                zero_blocks.append(i + 1)
+            else:
+                nonzero_blocks.append(i)
+                nonzero_blocks.append(i + 1)
+
+        self.file_map = {}
+        if zero_blocks:
+            self.file_map[FILE_MAP_ZERO_KEY] = \
+                BlocksManager(range_data=zero_blocks)
+        if nonzero_blocks:
+            self.file_map[FILE_MAP_NONZERO_KEY] = \
+                BlocksManager(range_data=nonzero_blocks)
+
+    def __del__(self):
+        self.__fd.close()
+
+    def __get_blocks_set_data(self, ranges):
+        """
+        Get the range data.
+        """
+        for s, e in ranges:
+            self.__fd.seek(s * self.block_size)
+            for _ in range(s, e):
+                yield self.__fd.read(self.block_size)
+
+    def range_sha256(self, ranges):
+        hash_obj = sha256()
+        for data in self.__get_blocks_set_data(ranges):
+            hash_obj.update(data)
+        return hash_obj.hexdigest()
+
+    def write_range_data_2_fd(self, ranges, file_obj):
+        for data in self.__get_blocks_set_data(ranges):
+            file_obj.write(data)

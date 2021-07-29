@@ -48,6 +48,8 @@ import xmltodict
 
 from gigraph_process import GigraphProcess
 from image_class import FullUpdateImage
+from image_class import is_sparse_image
+from image_class import RawImage
 from image_class import SparseImage
 from patch_package_process import PatchProcess
 from transfers_manager import TransfersManager
@@ -450,20 +452,30 @@ def increment_image_processing(
                 UPDATE_LOGGER.ERROR_LOG)
             clear_resource(err_clear=True)
             return False
-
-        src_sparse_image = SparseImage(each_src_image_path, each_src_map_path)
-        tgt_sparse_image = SparseImage(each_tgt_image_path, each_tgt_map_path)
+        src_is_sparse = is_sparse_image(each_src_image_path)
+        tgt_is_sparse = is_sparse_image(each_tgt_image_path)
+        if src_is_sparse and tgt_is_sparse:
+            src_image_class = \
+                SparseImage(each_src_image_path, each_src_map_path)
+            tgt_image_class = \
+                SparseImage(each_tgt_image_path, each_tgt_map_path)
+            
+        elif not src_is_sparse and not tgt_is_sparse:
+            src_image_class = RawImage(each_src_image_path)
+            tgt_image_class = RawImage(each_tgt_image_path)
+        else:
+            raise RuntimeError
 
         transfers_manager = TransfersManager(
-            each_img, tgt_sparse_image, src_sparse_image)
+            each_img, tgt_image_class, src_image_class)
         transfers_manager.find_process_needs()
         actions_list = transfers_manager.get_action_list()
 
-        graph_process = GigraphProcess(actions_list, src_sparse_image,
-                                       tgt_sparse_image)
+        graph_process = GigraphProcess(actions_list, src_image_class,
+                                       tgt_image_class)
         actions_list = graph_process.actions_list
-        patch_process = PatchProcess(each_img, tgt_sparse_image,
-                                     src_sparse_image,
+        patch_process = PatchProcess(each_img, tgt_image_class,
+                                     src_image_class,
                                      actions_list)
         patch_process.patch_process()
         patch_process.package_patch_zip.package_patch_zip()
