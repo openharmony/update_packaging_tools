@@ -541,8 +541,8 @@ class RawImage:
         nonzero_blocks = []
         reference = b'\0' * self.block_size
         for i in range(self.total_blocks):
-            d = self.__fd.read(self.block_size)
-            if d == reference:
+            blocks_data = self.__fd.read(self.block_size)
+            if blocks_data == reference:
                 zero_blocks.append(i)
                 zero_blocks.append(i + 1)
             else:
@@ -575,6 +575,6 @@ class RawImage:
             hash_obj.update(data)
         return hash_obj.hexdigest()
 
-    def write_range_data_2_fd(self, ranges, fd):
+    def write_range_data_2_fd(self, ranges, file_obj):
         for data in self.__get_blocks_set_data(ranges):
-            fd.write(data)
+            file_obj.write(data)

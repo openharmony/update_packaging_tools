@@ -47,7 +47,9 @@ import subprocess
 import xmltodict
 
 from gigraph_process import GigraphProcess
-from image_class import FullUpdateImage, is_sparse_image, RawImage
+from image_class import FullUpdateImage
+from image_class import is_sparse_image
+from image_class import RawImage
 from image_class import SparseImage
 from patch_package_process import PatchProcess
 from transfers_manager import TransfersManager
