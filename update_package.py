@@ -273,7 +273,7 @@ def signing_package(package_path, hash_algorithm,
     :param package_path: update package file path
     :param hash_algorithm: hash algorithm
     :param position: signature write location
-    :param package_type: the type of package，.bin/.zip
+    :param package_type: the type of package,.bin/.zip
     :return:
     """
     try:
