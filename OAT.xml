@@ -67,7 +67,8 @@ Note:If the text contains special characters, please escape them according to th
         </policylist>
 		<filefilterlist>			
 			<filefilter name="binaryFileTypePolicyFilter" desc="Filters for binary file policies" >		
-				<filteritem type="filepath" name="lib/libpackage.so" desc="自研二进制，源码在该updater仓中，许可证就是该仓许可证，二进制文件不包含三方文件"/>				
+				<filteritem type="filepath" name="lib/libpackage.so" desc="自研二进制，源码在该updater仓中，许可证就是该仓许可证，二进制文件不包含三方文件"/>
+					<filteritem type="filepath" name="lib/diff" desc="自研二进制，源码在该updater仓中，许可证就是该仓许可证，二进制文件不包含三方文件"/>
 			</filefilter>				
 	
 		</filefilterlist>
