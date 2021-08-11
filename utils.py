@@ -43,6 +43,7 @@ SCRIPT_FILE_NAME = '-script.us'
 UPDATER_CONFIG = "updater_config"
 XML_FILE_PATH = "updater_specified_config.xml"
 SO_PATH = os.path.join(operation_path, 'lib/libpackage.so')
+SO_PATH_L1 = os.path.join(operation_path, 'lib/libpackageL1.so')
 DIFF_EXE_PATH = os.path.join(operation_path, 'lib/diff')
 MISC_INFO_PATH = "misc_info.txt"
 VERSION_MBN_PATH = "VERSION.mbn"
@@ -120,6 +121,9 @@ class OptionsManager:
         self.signing_algorithm = None
         self.hash_algorithm = None
         self.private_key = None
+        self.not_l2 = False
+        self.signing_length = 256
+        self.xml_path = None
 
         self.make_dir_path = None
 
@@ -144,6 +148,7 @@ class OptionsManager:
         self.target_package_version = None
         self.source_package_version = None
         self.two_step = False
+        self.full_image_path_list = []
 
         self.partition_file_obj = None
 
@@ -236,7 +241,7 @@ def parse_update_config(xml_path):
     else:
         UPDATE_LOGGER.print_log("XML file does not exist! xml path: %s" %
                                 xml_path, UPDATE_LOGGER.ERROR_LOG)
-        return False, False, False, False, False, False
+        return False, False, False, False, False, False, False
     xml_content_dict = xmltodict.parse(xml_str, encoding='utf-8')
     package_dict = xml_content_dict.get('package', {})
     head_dict = package_dict.get('head', {}).get('info')
@@ -248,12 +253,14 @@ def parse_update_config(xml_path):
     whole_list = []
     difference_list = []
     component_dict = {}
+    full_image_path_list = []
 
-    expand_component(component_dict)
+    if not OPTIONS_MANAGER.not_l2:
+        expand_component(component_dict)
     if isinstance(component_info, OrderedDict):
         component_info = [component_info]
     if component_info is None:
-        return [], {}, [], [], '', False
+        return [], {}, [], [], '', [], False
     for component in component_info:
         component_list = list(component.values())
         component_list.pop()
@@ -263,10 +270,13 @@ def parse_update_config(xml_path):
             UPDATE_LOGGER.print_log("This component %s  repeats!" %
                                     component['@compAddr'],
                                     UPDATE_LOGGER.ERROR_LOG)
-            return False, False, False, False, False, False
+            return False, False, False, False, False, False, False
 
         if component['@compType'] == '0':
             whole_list.append(component['@compAddr'])
+            tem_path = os.path.join(OPTIONS_MANAGER.target_package_dir,
+                                    component.get("#text", None))
+            full_image_path_list.append(tem_path)
         elif component['@compType'] == '1':
             difference_list.append(component['@compAddr'])
 
@@ -276,7 +286,8 @@ def parse_update_config(xml_path):
     UPDATE_LOGGER.print_log('XML file parsing completed!')
 
     return head_list, component_dict, \
-        whole_list, difference_list, package_version, two_step
+        whole_list, difference_list, package_version, \
+        full_image_path_list, two_step
 
 
 def partitions_conversion(data):
@@ -368,6 +379,10 @@ def clear_options():
     OPTIONS_MANAGER.signing_algorithm = None
     OPTIONS_MANAGER.hash_algorithm = None
     OPTIONS_MANAGER.private_key = None
+    OPTIONS_MANAGER.not_l2 = False
+    OPTIONS_MANAGER.signing_length = 256
+    OPTIONS_MANAGER.xml_path = None
+    OPTIONS_MANAGER.full_image_path_list = []
 
     OPTIONS_MANAGER.make_dir_path = None
 
@@ -516,41 +531,47 @@ def get_update_info():
     Parse the configuration file to obtain the update information.
     :return: update information if any; false otherwise.
     """
-    OPTIONS_MANAGER.version_mbn_file_path = os.path.join(
-        OPTIONS_MANAGER.target_package_config_dir, VERSION_MBN_PATH)
-    version_mbn_content = \
-        get_file_content(
-            OPTIONS_MANAGER.version_mbn_file_path, os.path.basename(
-                os.path.join(OPTIONS_MANAGER.target_package_config_dir,
-                             VERSION_MBN_PATH)))
-    if version_mbn_content is False:
-        UPDATE_LOGGER.print_log(
-            "Get version mbn content failed!",
-            log_type=UPDATE_LOGGER.ERROR_LOG)
-        return False
-    OPTIONS_MANAGER.version_mbn_content = version_mbn_content
-    OPTIONS_MANAGER.board_list_file_path = os.path.join(
-        OPTIONS_MANAGER.target_package_config_dir, BOARD_LIST_PATH)
-    board_list_content = \
-        get_file_content(
-            OPTIONS_MANAGER.board_list_file_path, os.path.basename(
-                os.path.join(OPTIONS_MANAGER.target_package_config_dir,
-                             BOARD_LIST_PATH)))
-    if board_list_content is False:
-        UPDATE_LOGGER.print_log(
-            "Get board list content failed!",
-            log_type=UPDATE_LOGGER.ERROR_LOG)
-        return False
-    OPTIONS_MANAGER.board_list_content = board_list_content
+    if not OPTIONS_MANAGER.not_l2:
+        OPTIONS_MANAGER.version_mbn_file_path = os.path.join(
+            OPTIONS_MANAGER.target_package_config_dir, VERSION_MBN_PATH)
+        version_mbn_content = \
+            get_file_content(
+                OPTIONS_MANAGER.version_mbn_file_path, os.path.basename(
+                    os.path.join(OPTIONS_MANAGER.target_package_config_dir,
+                                 VERSION_MBN_PATH)))
+        if version_mbn_content is False:
+            UPDATE_LOGGER.print_log(
+                "Get version mbn content failed!",
+                log_type=UPDATE_LOGGER.ERROR_LOG)
+            return False
+        OPTIONS_MANAGER.version_mbn_content = version_mbn_content
+        OPTIONS_MANAGER.board_list_file_path = os.path.join(
+            OPTIONS_MANAGER.target_package_config_dir, BOARD_LIST_PATH)
+        board_list_content = \
+            get_file_content(
+                OPTIONS_MANAGER.board_list_file_path, os.path.basename(
+                    os.path.join(OPTIONS_MANAGER.target_package_config_dir,
+                                 BOARD_LIST_PATH)))
+        if board_list_content is False:
+            UPDATE_LOGGER.print_log(
+                "Get board list content failed!",
+                log_type=UPDATE_LOGGER.ERROR_LOG)
+            return False
+        OPTIONS_MANAGER.board_list_content = board_list_content
+
+    if OPTIONS_MANAGER.xml_path is None:
+        xml_file_path = os.path.join(
+            OPTIONS_MANAGER.target_package_config_dir, XML_FILE_PATH)
+    else:
+        xml_file_path = OPTIONS_MANAGER.xml_path
 
     # Parse the XML configuration file.
     head_info_list, component_info_dict, \
         full_img_list, incremental_img_list, \
         OPTIONS_MANAGER.target_package_version, \
+        OPTIONS_MANAGER.full_image_path_list, \
         OPTIONS_MANAGER.two_step = \
-        parse_update_config(
-            os.path.join(OPTIONS_MANAGER.target_package_config_dir,
-                         XML_FILE_PATH))
+        parse_update_config(xml_file_path)
     if head_info_list is False or component_info_dict is False or \
             full_img_list is False or incremental_img_list is False:
         UPDATE_LOGGER.print_log(
@@ -564,16 +585,16 @@ def get_update_info():
     return True
 
 
-def get_lib_api(input_path=None):
+def get_lib_api(is_l2=True):
     """
     Get the so API.
-    :param input_path: file path
+    :param is_l2: Is it L2 so
     :return:
     """
-    if input_path is not None:
-        so_path = "%s/%s" % (input_path, SO_PATH)
-    else:
+    if is_l2:
         so_path = SO_PATH
+    else:
+        so_path = SO_PATH_L1
     if not os.path.exists(so_path):
         UPDATE_LOGGER.print_log(
             "So does not exist! so path: %s" % so_path,

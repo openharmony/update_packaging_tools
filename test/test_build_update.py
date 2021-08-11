@@ -260,23 +260,23 @@ class TestUpdateUtils(unittest.TestCase):
         """
         create_input_package(
             "test_source_package", package_type="source")
-        check_re = check_incremental_args(False, None, None)
+        check_re = check_incremental_args(False, None, None, ["vendor"])
         self.assertEqual(check_re, False)
 
-        check_re = check_incremental_args(True, None, "")
+        check_re = check_incremental_args(True, None, "", ["vendor"])
         self.assertEqual(check_re, False)
 
-        check_re = check_incremental_args(False, "", "")
+        check_re = check_incremental_args(False, "", "", ["vendor"])
         self.assertEqual(check_re, False)
 
         OPTIONS_MANAGER.source_package_dir = "./"
-        check_re = check_incremental_args(False, None, "")
+        check_re = check_incremental_args(False, None, "", ["vendor"])
         self.assertEqual(check_re, False)
 
         OPTIONS_MANAGER.target_package_version = \
             "Hi3516DV300-eng 10 QP1A.190711.019"
         check_re = check_incremental_args(
-            False, None, "./test_source_package.zip")
+            False, None, "./test_source_package.zip", ["vendor"])
         clear_resource()
         self.assertEqual(check_re, False)
         clear_package("test_source_package")

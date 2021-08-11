@@ -47,7 +47,8 @@ class TestImage(unittest.TestCase):
                 content = r_f.read()
             w_f.write(content)
         verse_script = VerseScript()
-        FullUpdateImage("", ["vendor"], verse_script).update_full_image()
+        FullUpdateImage("", ["vendor"], verse_script, ["vendor.img"]).\
+            update_full_image()
         clear_resource()
         check_re = len(verse_script.script) != 0
         print(verse_script.script)
