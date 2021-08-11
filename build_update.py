@@ -447,13 +447,16 @@ def increment_image_processing(
             clear_resource(err_clear=True)
             return False
 
-        check_make_map_path(each_img)
-        cmd = ["e2fsdroid", "-B", each_src_map_path,
-               "-a", "/%s" % each_img, each_src_image_path]
-        sub_p = subprocess.Popen(
-            cmd, shell=False, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT)
-        sub_p.wait()
+        src_is_sparse = is_sparse_image(each_src_image_path)
+        tgt_is_sparse = is_sparse_image(each_tgt_image_path)
+        if src_is_sparse and tgt_is_sparse:
+            check_make_map_path(each_img)
+            cmd = ["e2fsdroid", "-B", each_src_map_path,
+                   "-a", "/%s" % each_img, each_src_image_path]
+            sub_p = subprocess.Popen(
+                cmd, shell=False, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT)
+            sub_p.wait()
 
         if not os.path.exists(each_tgt_image_path):
             UPDATE_LOGGER.print_log(
@@ -466,13 +469,13 @@ def increment_image_processing(
                 UPDATE_LOGGER.ERROR_LOG)
             clear_resource(err_clear=True)
             return False
-
-        cmd = ["e2fsdroid", "-B", each_tgt_map_path,
-               "-a", "/%s" % each_img, each_tgt_image_path]
-        sub_p = subprocess.Popen(
-            cmd, shell=False, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT)
-        sub_p.wait()
+        if src_is_sparse and tgt_is_sparse:
+            cmd = ["e2fsdroid", "-B", each_tgt_map_path,
+                   "-a", "/%s" % each_img, each_tgt_image_path]
+            sub_p = subprocess.Popen(
+                cmd, shell=False, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT)
+            sub_p.wait()
 
         if filecmp.cmp(each_src_image_path, each_tgt_image_path):
             UPDATE_LOGGER.print_log(
@@ -482,8 +485,7 @@ def increment_image_processing(
                 UPDATE_LOGGER.ERROR_LOG)
             clear_resource(err_clear=True)
             return False
-        src_is_sparse = is_sparse_image(each_src_image_path)
-        tgt_is_sparse = is_sparse_image(each_tgt_image_path)
+
         if src_is_sparse and tgt_is_sparse:
             src_image_class = \
                 SparseImage(each_src_image_path, each_src_map_path)
@@ -659,6 +661,12 @@ def main():
                 OPTIONS_MANAGER.target_package_dir) is False:
             clear_resource(err_clear=True)
             return
+    else:
+        if source_package is not None:
+            UPDATE_LOGGER.print_log(
+                "There is no incremental image, "
+                "the - S parameter is not required!",
+                UPDATE_LOGGER.ERROR_LOG)
 
     # Full processing
     if len(OPTIONS_MANAGER.full_img_list) != 0:
