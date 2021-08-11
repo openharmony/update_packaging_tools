@@ -447,16 +447,13 @@ def increment_image_processing(
             clear_resource(err_clear=True)
             return False
 
-        src_is_sparse = is_sparse_image(each_src_image_path)
-        tgt_is_sparse = is_sparse_image(each_tgt_image_path)
-        if src_is_sparse and tgt_is_sparse:
-            check_make_map_path(each_img)
-            cmd = ["e2fsdroid", "-B", each_src_map_path,
-                   "-a", "/%s" % each_img, each_src_image_path]
-            sub_p = subprocess.Popen(
-                cmd, shell=False, stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT)
-            sub_p.wait()
+        check_make_map_path(each_img)
+        cmd = ["e2fsdroid", "-B", each_src_map_path,
+               "-a", "/%s" % each_img, each_src_image_path]
+        sub_p = subprocess.Popen(
+            cmd, shell=False, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT)
+        sub_p.wait()
 
         if not os.path.exists(each_tgt_image_path):
             UPDATE_LOGGER.print_log(
@@ -469,13 +466,13 @@ def increment_image_processing(
                 UPDATE_LOGGER.ERROR_LOG)
             clear_resource(err_clear=True)
             return False
-        if src_is_sparse and tgt_is_sparse:
-            cmd = ["e2fsdroid", "-B", each_tgt_map_path,
-                   "-a", "/%s" % each_img, each_tgt_image_path]
-            sub_p = subprocess.Popen(
-                cmd, shell=False, stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT)
-            sub_p.wait()
+
+        cmd = ["e2fsdroid", "-B", each_tgt_map_path,
+               "-a", "/%s" % each_img, each_tgt_image_path]
+        sub_p = subprocess.Popen(
+            cmd, shell=False, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT)
+        sub_p.wait()
 
         if filecmp.cmp(each_src_image_path, each_tgt_image_path):
             UPDATE_LOGGER.print_log(
@@ -485,7 +482,8 @@ def increment_image_processing(
                 UPDATE_LOGGER.ERROR_LOG)
             clear_resource(err_clear=True)
             return False
-
+        src_is_sparse = is_sparse_image(each_src_image_path)
+        tgt_is_sparse = is_sparse_image(each_tgt_image_path)
         if src_is_sparse and tgt_is_sparse:
             src_image_class = \
                 SparseImage(each_src_image_path, each_src_map_path)
@@ -578,6 +576,35 @@ def check_make_map_path(each_img):
     return True
 
 
+def incremental_processing(no_zip, partition_file, source_package,
+                           verse_script):
+    if len(OPTIONS_MANAGER.incremental_img_list) != 0:
+        if check_incremental_args(no_zip, partition_file, source_package,
+                                  OPTIONS_MANAGER.incremental_img_list) \
+                is False:
+            return False
+        if increment_image_processing(
+                verse_script, OPTIONS_MANAGER.incremental_img_list,
+                OPTIONS_MANAGER.source_package_dir,
+                OPTIONS_MANAGER.target_package_dir) is False:
+            return False
+
+
+def check_args(private_key, source_package, target_package, update_package):
+    if source_package is False or private_key is False or \
+            target_package is False or update_package is False:
+        return False
+    if check_miss_private_key(private_key) is False:
+        return False
+    if check_target_package_path(target_package) is False:
+        return False
+    if get_update_info() is False:
+        return False
+    if check_images_list() is False:
+        return False
+    return True
+
+
 def main():
     """
     Entry function.
@@ -589,23 +616,8 @@ def main():
         create_entrance_args()
     if not_l2:
         no_zip = True
-    if source_package is False or private_key is False or \
-            target_package is False or update_package is False:
-        return
-
-    if check_miss_private_key(private_key) is False:
-        clear_resource(err_clear=True)
-        return
-
-    if check_target_package_path(target_package) is False:
-        clear_resource(err_clear=True)
-        return
-
-    if get_update_info() is False:
-        clear_resource(err_clear=True)
-        return
-
-    if check_images_list() is False:
+    if check_args(private_key, source_package,
+                  target_package, update_package) is False:
         clear_resource(err_clear=True)
         return
 
@@ -649,24 +661,10 @@ def main():
                 reboot_now_cmd=reboot_now_cmd)
         verse_script.add_command(create_updater_script_command)
 
-    if len(OPTIONS_MANAGER.incremental_img_list) != 0:
-        if check_incremental_args(no_zip, partition_file, source_package,
-                                  OPTIONS_MANAGER.incremental_img_list)\
-                is False:
-            clear_resource(err_clear=True)
-            return
-        if increment_image_processing(
-                verse_script, OPTIONS_MANAGER.incremental_img_list,
-                OPTIONS_MANAGER.source_package_dir,
-                OPTIONS_MANAGER.target_package_dir) is False:
-            clear_resource(err_clear=True)
-            return
-    else:
-        if source_package is not None:
-            UPDATE_LOGGER.print_log(
-                "There is no incremental image, "
-                "the - S parameter is not required!",
-                UPDATE_LOGGER.ERROR_LOG)
+    if incremental_processing(
+            no_zip, partition_file, source_package, verse_script) is False:
+        clear_resource(err_clear=True)
+        return
 
     # Full processing
     if len(OPTIONS_MANAGER.full_img_list) != 0:

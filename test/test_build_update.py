@@ -164,7 +164,7 @@ class TestUpdateUtils(unittest.TestCase):
         sys.argv.append("-pk")
         sys.argv.append("./rsa_private_key2048.pem")
         main()
-        output = "./output_test/demo"
+        output = "./output_test/"
         pkg_re = len(os.listdir(output))
         shutil.rmtree("./output_test")
         self.assertEqual(pkg_re, 0)
