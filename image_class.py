@@ -44,10 +44,11 @@ class FullUpdateImage:
     """
 
     def __init__(self, target_package_images_dir, full_img_list, verse_script,
-                 no_zip=False):
+                 full_image_path_list, no_zip=False):
         self.__target_package_images_dir = target_package_images_dir
         self.__full_img_list = full_img_list
         self.__verse_script = verse_script
+        self.__full_image_path_list = full_image_path_list
         self.__no_zip = no_zip
 
     def update_full_image(self):
@@ -58,8 +59,9 @@ class FullUpdateImage:
         """
         full_image_file_obj_list = []
         full_image_content_len_list = []
-        for each_name in self.__full_img_list:
-            full_image_content = self.get_full_image_content(each_name)
+        for idx, each_name in enumerate(self.__full_img_list):
+            full_image_content = self.get_full_image_content(
+                self.__full_image_path_list[idx])
             if full_image_content is False:
                 UPDATE_LOGGER.print_log(
                     "Get full image content failed!",
@@ -68,6 +70,7 @@ class FullUpdateImage:
             each_img = tempfile.NamedTemporaryFile(
                 prefix="full_image%s" % each_name, mode='wb')
             each_img.write(full_image_content)
+            each_img.seek(0)
             full_image_content_len_list.append(len(full_image_content))
             full_image_file_obj_list.append(each_img)
             UPDATE_LOGGER.print_log(
@@ -81,32 +84,34 @@ class FullUpdateImage:
                         each_name, sparse_image_write_cmd)
                 else:
                     raw_image_write_cmd = \
-                        self.__verse_script.raw_image_write(each_name)
+                        self.__verse_script.raw_image_write(
+                            each_name)
                     cmd = '%s_WRITE_FLAG%s' % (
                         each_name, raw_image_write_cmd)
-                self.__verse_script.add_command(
-                    cmd=cmd)
+                if each_name not in ("boot", "updater_boot",
+                                     "updater", "updater_b"):
+                    self.__verse_script.add_command(
+                        cmd=cmd)
 
         UPDATE_LOGGER.print_log(
             "All full image processing completed! image count: %d" %
             len(self.__full_img_list))
         return full_image_content_len_list, full_image_file_obj_list
 
-    def get_full_image_content(self, each_name):
+    @staticmethod
+    def get_full_image_content(each_name):
         """
         Obtain the full image content.
         :param each_name: image name
-        :return content: full image content if available; false otehrwise
+        :return content: full image content if available; false otherwise
         """
-        each_image_path = os.path.join(self.__target_package_images_dir,
-                                       '%s.img' % each_name)
+        each_image_path = each_name
         if not os.path.exists(each_image_path):
             UPDATE_LOGGER.print_log(
-                "The %s.img file is missing from the target package, "
-                "the component: %s cannot be full update processed. "
-                "path: %s" %
-                (each_name, each_name, each_image_path),
-                UPDATE_LOGGER.ERROR_LOG)
+                "The file is missing "
+                "from the target package, "
+                "the component: %s cannot be full update processed. " %
+                each_image_path)
             return False
         with open(each_image_path, 'rb') as f_r:
             content = f_r.read()
@@ -121,7 +126,10 @@ def is_sparse_image(img_path):
     """
     with open(img_path, 'rb') as f_r:
         image_content = f_r.read(HEADER_INFO_LEN)
-        header_info = struct.unpack(HEADER_INFO_FORMAT, image_content)
+        try:
+            header_info = struct.unpack(HEADER_INFO_FORMAT, image_content)
+        except struct.error:
+            return False
         *_, is_sparse = SparseImage.image_header_info_check(header_info)
     return is_sparse
 

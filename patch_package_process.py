@@ -25,6 +25,7 @@ from transfers_manager import ActionType
 from update_package import PkgHeader
 from update_package import PkgComponent
 from utils import OPTIONS_MANAGER
+from utils import ON_SERVER
 from utils import DIFF_EXE_PATH
 from utils import get_lib_api
 
@@ -547,6 +548,7 @@ class PackagePatchZip:
         self.partition_head_list.digest_method = 0
         self.partition_head_list.sign_method = 0
         self.partition_head_list.pkg_type = 2
+        self.partition_head_list.pkg_flags = 0
         self.partition_head_list.entry_count = 3
         self.partition_component_list[0].file_path = \
             self.new_dat_file_obj.name.encode("utf-8")
@@ -570,7 +572,11 @@ class PackagePatchZip:
         self.partition_component_list[2].component_addr = \
             self.partition_transfer_file_name.encode("utf-8")
         lib = get_lib_api()
+        if OPTIONS_MANAGER.private_key == ON_SERVER:
+            private_key = "./update_package.py"
+        else:
+            private_key = OPTIONS_MANAGER.private_key.encode("utf-8")
         lib.CreatePackage(pointer(self.partition_head_list),
                           self.partition_component_list,
                           self.partition_file_obj.name.encode("utf-8"),
-                          OPTIONS_MANAGER.private_key.encode("utf-8"))
+                          private_key)

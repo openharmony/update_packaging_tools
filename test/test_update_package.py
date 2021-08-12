@@ -129,7 +129,7 @@ class TestUpdatePackage(unittest.TestCase):
 
     def test_signing_package(self):
         """
-        signing_package
+        test signing_package
         :return:
         """
         package_path = 'test.zip'

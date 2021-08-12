@@ -37,7 +37,11 @@ optional arguments:
                         supported by the tool include ['sha256', 'sha384'].
   -pk PRIVATE_KEY, --private_key PRIVATE_KEY
                         Private key file path.
-
+  -nl2, --not_l2        Not L2 mode, Distinguish between L1 and L2.
+  -sl {256,384}, --signing_length {256,384}
+                        The signing content length
+                        supported by the tool include ['256', '384'].
+  -xp, --xml_path       XML file path.
 """
 import filecmp
 import os
@@ -165,6 +169,16 @@ def create_entrance_args():
                              "['sha256', 'sha384'].")
     parser.add_argument("-pk", "--private_key", type=private_key_check,
                         default=None, help="Private key file path.")
+    parser.add_argument("-nl2", "--not_l2", action='store_true',
+                        help="Not L2 mode, Distinguish between L1 and L2.")
+    parser.add_argument("-sl", "--signing_length", default='256',
+                        choices=['256', '384'],
+                        help="The signing content length "
+                             "supported by the tool include "
+                             "['256', '384'].")
+    parser.add_argument("-xp", "--xml_path", type=private_key_check,
+                        default=None, help="XML file path.")
+
     args = parser.parse_args()
     source_package = args.source_package
     OPTIONS_MANAGER.source_package = source_package
@@ -182,7 +196,15 @@ def create_entrance_args():
     OPTIONS_MANAGER.hash_algorithm = hash_algorithm
     private_key = args.private_key
     OPTIONS_MANAGER.private_key = private_key
-    return source_package, target_package, update_package, no_zip, \
+
+    not_l2 = args.not_l2
+    OPTIONS_MANAGER.not_l2 = not_l2
+    signing_length = int(args.signing_length)
+    OPTIONS_MANAGER.signing_length = signing_length
+    xml_path = args.xml_path
+    OPTIONS_MANAGER.xml_path = xml_path
+
+    return source_package, target_package, update_package, no_zip, not_l2, \
         partition_file, signing_algorithm, hash_algorithm, private_key
 
 
@@ -208,15 +230,23 @@ def get_script_obj():
     return prelude_script, verse_script, refrain_script, ending_script
 
 
-def check_incremental_args(no_zip, partition_file, source_package):
+def check_incremental_args(no_zip, partition_file, source_package,
+                           incremental_img_list):
     """
     When the incremental list is not empty, incremental processing is required.
     In this case, check related arguments.
-    :param no_zip:
+    :param no_zip: no zip mode
     :param partition_file:
     :param source_package:
+    :param incremental_img_list:
     :return:
     """
+    if "boot" in incremental_img_list:
+        UPDATE_LOGGER.print_log(
+            "boot cannot be incrementally processed!",
+            UPDATE_LOGGER.ERROR_LOG)
+        clear_resource(err_clear=True)
+        return False
     if source_package is None:
         UPDATE_LOGGER.print_log(
             "The source package is missing, "
@@ -546,32 +576,48 @@ def check_make_map_path(each_img):
     return True
 
 
+def incremental_processing(no_zip, partition_file, source_package,
+                           verse_script):
+    if len(OPTIONS_MANAGER.incremental_img_list) != 0:
+        if check_incremental_args(no_zip, partition_file, source_package,
+                                  OPTIONS_MANAGER.incremental_img_list) \
+                is False:
+            return False
+        if increment_image_processing(
+                verse_script, OPTIONS_MANAGER.incremental_img_list,
+                OPTIONS_MANAGER.source_package_dir,
+                OPTIONS_MANAGER.target_package_dir) is False:
+            return False
+
+
+def check_args(private_key, source_package, target_package, update_package):
+    if source_package is False or private_key is False or \
+            target_package is False or update_package is False:
+        return False
+    if check_miss_private_key(private_key) is False:
+        return False
+    if check_target_package_path(target_package) is False:
+        return False
+    if get_update_info() is False:
+        return False
+    if check_images_list() is False:
+        return False
+    return True
+
+
 def main():
     """
     Entry function.
     """
     OPTIONS_MANAGER.product = PRODUCT
 
-    source_package, target_package, update_package, no_zip, \
+    source_package, target_package, update_package, no_zip, not_l2, \
         partition_file, signing_algorithm, hash_algorithm, private_key = \
         create_entrance_args()
-    if source_package is False or private_key is False or \
-            target_package is False or update_package is False:
-        return
-
-    if check_miss_private_key(private_key) is False:
-        clear_resource(err_clear=True)
-        return
-
-    if check_target_package_path(target_package) is False:
-        clear_resource(err_clear=True)
-        return
-
-    if get_update_info() is False:
-        clear_resource(err_clear=True)
-        return
-
-    if check_images_list() is False:
+    if not_l2:
+        no_zip = True
+    if check_args(private_key, source_package,
+                  target_package, update_package) is False:
         clear_resource(err_clear=True)
         return
 
@@ -615,17 +661,10 @@ def main():
                 reboot_now_cmd=reboot_now_cmd)
         verse_script.add_command(create_updater_script_command)
 
-    if len(OPTIONS_MANAGER.incremental_img_list) != 0:
-        if check_incremental_args(no_zip, partition_file, source_package)\
-                is False:
-            clear_resource(err_clear=True)
-            return
-        if increment_image_processing(
-                verse_script, OPTIONS_MANAGER.incremental_img_list,
-                OPTIONS_MANAGER.source_package_dir,
-                OPTIONS_MANAGER.target_package_dir) is False:
-            clear_resource(err_clear=True)
-            return
+    if incremental_processing(
+            no_zip, partition_file, source_package, verse_script) is False:
+        clear_resource(err_clear=True)
+        return
 
     # Full processing
     if len(OPTIONS_MANAGER.full_img_list) != 0:
@@ -633,6 +672,7 @@ def main():
         full_image_content_len_list, full_image_file_obj_list = \
             FullUpdateImage(OPTIONS_MANAGER.target_package_dir,
                             OPTIONS_MANAGER.full_img_list, verse_script,
+                            OPTIONS_MANAGER.full_image_path_list,
                             no_zip=OPTIONS_MANAGER.no_zip).\
             update_full_image()
         if full_image_content_len_list is False or \

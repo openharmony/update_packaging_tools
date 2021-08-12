@@ -44,6 +44,9 @@ from utils import BUILD_TOOLS_FILE_NAME
 from utils import get_lib_api
 
 IS_DEL = 0
+SIGNING_LENGTH_256 = 256
+DIGEST_LEN = 32
+HASH_VALUE_MAX_LEN = 128
 
 
 class SignMethod(Enum):
@@ -55,6 +58,7 @@ class PkgHeader(Structure):
     _fields_ = [("digest_method", c_ubyte),
                 ("sign_method", c_ubyte),
                 ("pkg_type", c_ubyte),
+                ("pkg_flags", c_ubyte),
                 ("entry_count", c_int),
                 ("update_file_version", c_int),
                 ("product_update_id", c_char_p),
@@ -65,7 +69,7 @@ class PkgHeader(Structure):
 
 
 class PkgComponent(Structure):
-    _fields_ = [("digest", c_ubyte * 32),
+    _fields_ = [("digest", c_ubyte * DIGEST_LEN),
                 ("file_path", c_char_p),
                 ("component_addr", c_char_p),
                 ("version", c_char_p),
@@ -75,6 +79,12 @@ class PkgComponent(Structure):
                 ("res_type", c_ubyte),
                 ("type", c_ubyte),
                 ("flags", c_ubyte)]
+
+
+class SignInfo (Structure):
+    _fields_ = [("sign_offset", c_int),
+                ("hash_len", c_int),
+                ("hash_code", c_ubyte * (HASH_VALUE_MAX_LEN + 1))]
 
 
 def create_update_bin():
@@ -95,13 +105,17 @@ def create_update_bin():
 
     all_image_file_obj_list = \
         incremental_image_file_obj_list + full_image_file_obj_list
-    if OPTIONS_MANAGER.partition_file_obj is not None:
-        all_image_name = \
-            EXTEND_COMPONENT_LIST + EXTEND_OPTIONAL_COMPONENT_LIST + \
-            incremental_img_list + full_img_list
+    if not OPTIONS_MANAGER.not_l2:
+        if OPTIONS_MANAGER.partition_file_obj is not None:
+            all_image_name = \
+                EXTEND_COMPONENT_LIST + EXTEND_OPTIONAL_COMPONENT_LIST + \
+                incremental_img_list + full_img_list
+        else:
+            all_image_name = \
+                EXTEND_COMPONENT_LIST + incremental_img_list + full_img_list
     else:
         all_image_name = \
-            EXTEND_COMPONENT_LIST + incremental_img_list + full_img_list
+            incremental_img_list + full_img_list
     sort_component_dict = OrderedDict()
     for each_image_name in all_image_name:
         sort_component_dict[each_image_name] = \
@@ -113,15 +127,31 @@ def create_update_bin():
         all_image_file_obj_list, component_dict)
 
     save_patch = update_bin_obj.name.encode("utf-8")
+    sign_info = SignInfo()
+    if OPTIONS_MANAGER.private_key == ON_SERVER:
+        private_key = "./update_package.py"
+    else:
+        private_key = OPTIONS_MANAGER.private_key.encode("utf-8")
     lib = get_lib_api()
-    lib.CreatePackage(
-        pointer(head_list), component_list, save_patch,
-        OPTIONS_MANAGER.private_key.encode("utf-8"))
+    lib_l1 = get_lib_api(is_l2=False)
+    if OPTIONS_MANAGER.not_l2:
+        lib_l1.CreatePackageWithSignInfo(
+            pointer(head_list), component_list, save_patch,
+            private_key, pointer(sign_info))
+
+        offset = sign_info.sign_offset
+        hash_code = bytes(sign_info.hash_code).decode('ascii')
+    else:
+        lib.CreatePackage(
+            pointer(head_list), component_list, save_patch,
+            OPTIONS_MANAGER.private_key.encode("utf-8"))
+        offset = 0
+        hash_code = b""
 
     if OPTIONS_MANAGER.private_key == ON_SERVER:
-        offset = 0
         signing_package(update_bin_obj.name,
-                        OPTIONS_MANAGER.hash_algorithm, position=offset)
+                        OPTIONS_MANAGER.hash_algorithm, hash_code=hash_code,
+                        position=offset)
 
     UPDATE_LOGGER.print_log(".bin package signing success!")
     UPDATE_LOGGER.print_log(
@@ -140,16 +170,20 @@ def get_component_list(all_image_file_obj_list, component_dict):
     """
     pkg_components = PkgComponent * len(component_dict)
     component_list = pkg_components()
-    if OPTIONS_MANAGER.partition_file_obj is not None:
-        extend_component_list = \
-            EXTEND_COMPONENT_LIST + EXTEND_OPTIONAL_COMPONENT_LIST
-        extend_path_list = [OPTIONS_MANAGER.version_mbn_file_path,
-                            OPTIONS_MANAGER.board_list_file_path,
-                            OPTIONS_MANAGER.partition_file_obj.name]
+    if not OPTIONS_MANAGER.not_l2:
+        if OPTIONS_MANAGER.partition_file_obj is not None:
+            extend_component_list = \
+                EXTEND_COMPONENT_LIST + EXTEND_OPTIONAL_COMPONENT_LIST
+            extend_path_list = [OPTIONS_MANAGER.version_mbn_file_path,
+                                OPTIONS_MANAGER.board_list_file_path,
+                                OPTIONS_MANAGER.partition_file_obj.name]
+        else:
+            extend_component_list = EXTEND_COMPONENT_LIST
+            extend_path_list = [OPTIONS_MANAGER.version_mbn_file_path,
+                                OPTIONS_MANAGER.board_list_file_path]
     else:
-        extend_component_list = EXTEND_COMPONENT_LIST
-        extend_path_list = [OPTIONS_MANAGER.version_mbn_file_path,
-                            OPTIONS_MANAGER.board_list_file_path]
+        extend_component_list = []
+        extend_path_list = []
     idx = 0
     for key, component in component_dict.items():
         if idx < len(extend_component_list):
@@ -166,8 +200,12 @@ def get_component_list(all_image_file_obj_list, component_dict):
         component_list[idx].digest = (c_ubyte * 32).from_buffer_copy(
             binascii.a2b_hex(digest.encode('utf-8')))
         component_list[idx].file_path = file_path.encode("utf-8")
-        component_list[idx].component_addr = \
-            ('/%s' % component[0]).encode("utf-8")
+        if not OPTIONS_MANAGER.not_l2:
+            component_list[idx].component_addr = \
+                ('/%s' % component[0]).encode("utf-8")
+        else:
+            component_list[idx].component_addr = \
+                ('%s' % component[0]).encode("utf-8")
         component_list[idx].version = component[4].encode("utf-8")
         component_list[idx].size = os.path.getsize(file_path)
         component_list[idx].id = int(component[1])
@@ -178,6 +216,7 @@ def get_component_list(all_image_file_obj_list, component_dict):
         component_list[idx].res_type = int(component[2])
         component_list[idx].type = int(component[3])
         component_list[idx].flags = IS_DEL
+
         idx += 1
     return component_list
 
@@ -190,14 +229,26 @@ def get_head_list(component_count, head_value_list):
     :return head_list: header list
     """
     head_list = PkgHeader()
-    head_list.digest_method = 2
-    if OPTIONS_MANAGER.signing_algorithm == "ECC":
-        # signing algorithm use ECC
-        head_list.sign_method = SignMethod.ECC.value
+    if OPTIONS_MANAGER.signing_length != SIGNING_LENGTH_256:
+        # PKG_DIGEST_TYPE_SHA384   3,use sha384
+        head_list.digest_method = 3
     else:
-        # signing algorithm use RSA
-        head_list.sign_method = SignMethod.RSA.value
+        # PKG_DIGEST_TYPE_SHA256   2,use sha256
+        head_list.digest_method = 2
+    if OPTIONS_MANAGER.private_key == ON_SERVER:
+        head_list.sign_method = 0
+    else:
+        if OPTIONS_MANAGER.signing_algorithm == "ECC":
+            # signing algorithm use ECC
+            head_list.sign_method = SignMethod.ECC.value
+        else:
+            # signing algorithm use RSA
+            head_list.sign_method = SignMethod.RSA.value
     head_list.pkg_type = 1
+    if OPTIONS_MANAGER.not_l2:
+        head_list.pkg_flags = 1
+    else:
+        head_list.pkg_flags = 0
     head_list.entry_count = component_count
     head_list.update_file_version = int(head_value_list[0])
     head_list.product_update_id = head_value_list[1].encode("utf-8")
@@ -239,11 +290,12 @@ def get_tools_head_list(component_count):
     head_list.digest_method = 0
     head_list.sign_method = 0
     head_list.pkg_type = 2
+    head_list.pkg_flags = 0
     head_list.entry_count = component_count
     return head_list
 
 
-def get_signing_from_server(package_path, hash_algorithm):
+def get_signing_from_server(package_path, hash_algorithm, hash_code=None):
     """
     Server update package signature requires the vendor to
     implement its own service signature interface, as shown below:
@@ -252,40 +304,43 @@ def get_signing_from_server(package_path, hash_algorithm):
     pass_word = ""
     signe_jar = ""
     signing_config = [signe_jar, ip, user_name, pass_word,
-                      package_path, hash_algorithm]
+                      hash_code, hash_algorithm]
     cmd = ' '.join(signing_config)
     subprocess.Popen(
         cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     :param package_path: update package file path
     :param hash_algorithm: hash algorithm
+    :param hash_code: hash code
     :return:
     """
-    UPDATE_LOGGER.print_log("Signing %s, hash algorithm is: %s" %
-                            (package_path, hash_algorithm))
+    UPDATE_LOGGER.print_log("Signing %s, hash algorithm is: %s, "
+                            "Signing hash code: %s" %
+                            (package_path, hash_algorithm, hash_code))
     signing_content = ""
-    return signing_content
+    return signing_content.encode()
 
 
-def signing_package(package_path, hash_algorithm,
+def signing_package(package_path, hash_algorithm, hash_code=None,
                     position=0, package_type='.bin'):
     """
     Update package signature.
     :param package_path: update package file path
     :param hash_algorithm: hash algorithm
     :param position: signature write location
+    :param hash_code: hash code
     :param package_type: the type of package,.bin/.zip
     :return:
     """
     try:
         signing_content = get_signing_from_server(
-            package_path, hash_algorithm)
+            package_path, hash_algorithm, hash_code)
         if position != 0:
             with open(package_path, mode='rb+') as f_r:
                 f_r.seek(position)
-                f_r.write(signing_content.encode())
+                f_r.write(signing_content)
         else:
             with open(package_path, mode='ab') as f_w:
-                f_w.write(signing_content.encode())
+                f_w.write(signing_content)
         return True
     except (OSError, TypeError):
         UPDATE_LOGGER.print_log("%s package signing failed!" % package_type)
@@ -346,9 +401,14 @@ def create_build_tools_zip(lib):
         component_list[num + 2].component_addr = \
             REGISTER_SCRIPT_FILE_NAME.encode("utf-8")
 
+    if OPTIONS_MANAGER.private_key == ON_SERVER:
+        private_key = "./update_package.py"
+    else:
+        private_key = OPTIONS_MANAGER.private_key.encode("utf-8")
+
     lib.CreatePackage(
         pointer(head_list), component_list, file_save_patch,
-        OPTIONS_MANAGER.private_key.encode("utf-8"))
+        private_key)
     return file_obj
 
 
@@ -386,14 +446,23 @@ def build_update_package(no_zip, update_package, prelude_script,
             return False
         OPTIONS_MANAGER.build_tools_zip_obj = build_tools_zip_obj
         head_list = PkgHeader()
-        head_list.digest_method = 2
-        if OPTIONS_MANAGER.signing_algorithm == "ECC":
-            # signing algorithm use ECC
-            head_list.sign_method = SignMethod.ECC.value
+        if OPTIONS_MANAGER.signing_length != SIGNING_LENGTH_256:
+            # PKG_DIGEST_TYPE_SHA384   3,use sha384
+            head_list.digest_method = 3
         else:
-            # signing algorithm use RSA
-            head_list.sign_method = SignMethod.RSA.value
+            # PKG_DIGEST_TYPE_SHA256   2,use sha256
+            head_list.digest_method = 2
+        if OPTIONS_MANAGER.private_key == ON_SERVER:
+            head_list.sign_method = 0
+        else:
+            if OPTIONS_MANAGER.signing_algorithm == "ECC":
+                # signing algorithm use ECC
+                head_list.sign_method = SignMethod.ECC.value
+            else:
+                # signing algorithm use RSA
+                head_list.sign_method = SignMethod.RSA.value
         head_list.pkg_type = 2
+        head_list.pkg_flags = 0
         head_list.entry_count = 2
         pkg_components = PkgComponent * 2
         component_list = pkg_components()
@@ -404,14 +473,29 @@ def build_update_package(no_zip, update_package, prelude_script,
             OPTIONS_MANAGER.build_tools_zip_obj.name.encode("utf-8")
         component_list[1].component_addr = \
             BUILD_TOOLS_FILE_NAME.encode("utf-8")
-        lib.CreatePackage(
-            pointer(head_list), component_list,
-            update_package_path.encode("utf-8"),
-            OPTIONS_MANAGER.private_key.encode("utf-8"))
+
+        sign_info = SignInfo()
+        if OPTIONS_MANAGER.private_key == ON_SERVER:
+            private_key = "./update_package.py"
+        else:
+            private_key = OPTIONS_MANAGER.private_key.encode("utf-8")
+        lib = get_lib_api()
+        lib_l1 = get_lib_api(is_l2=False)
+        if OPTIONS_MANAGER.not_l2:
+            lib_l1.CreatePackageWithSignInfo(
+                pointer(head_list), component_list,
+                update_package_path.encode("utf-8"),
+                private_key, pointer(sign_info))
+        else:
+            lib.CreatePackage(
+                pointer(head_list), component_list,
+                update_package_path.encode("utf-8"),
+                OPTIONS_MANAGER.private_key.encode("utf-8"))
 
         if OPTIONS_MANAGER.private_key == ON_SERVER:
+            hash_code = "".join(["%x" % each for each in sign_info.hash_code])
             signing_package(update_bin_obj.name,
-                            OPTIONS_MANAGER.hash_algorithm,
+                            OPTIONS_MANAGER.hash_algorithm, hash_code,
                             package_type='.zip')
 
         UPDATE_LOGGER.print_log(".zip package signing success!")

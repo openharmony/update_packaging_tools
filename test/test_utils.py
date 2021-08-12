@@ -82,12 +82,15 @@ class TestUtils(unittest.TestCase):
             w_f.write(UPDATER_SPECIFIED_CONFIG_REPEATS.encode())
         check_re = parse_update_config("test.xml")
         clear_resource()
-        self.assertEqual(check_re, (False, False, False, False, False, False))
+        self.assertEqual(
+            check_re, (False, False, False, False, False, False, False))
 
+        OPTIONS_MANAGER.target_package_dir = "./"
         check_re = parse_update_config(
             "./updater_specified_config_repeats.xml")
         clear_resource()
-        self.assertEqual(check_re, (False, False, False, False, False, False))
+        self.assertEqual(
+            check_re, (False, False, False, False, False, False, False))
         if os.path.exists("./updater_specified_config_repeats.xml"):
             os.remove("./updater_specified_config_repeats.xml")
 
@@ -141,14 +144,6 @@ class TestUtils(unittest.TestCase):
         if os.path.exists(BOARD_LIST_PATH):
             os.remove(BOARD_LIST_PATH)
         self.assertEqual(check_re, False)
-
-    def test_get_lib_api(self):
-        """
-        get_lib_api, So does not exist
-        :return:
-        """
-        with self.assertRaises(RuntimeError):
-            get_lib_api("test")
 
     def test_parse_partition_file_xml(self):
         """
