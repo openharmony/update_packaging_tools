@@ -89,6 +89,8 @@ MAX_BLOCKS_PER_GROUP = BLOCK_LIMIT = 1024
 PER_BLOCK_SIZE = 4096
 TWO_STEP = "updater"
 
+SD_CARD_IMAGE_LIST = ["system", "vendor", "userdata"]
+
 
 def singleton(cls):
     _instance = {}
@@ -124,6 +126,7 @@ class OptionsManager:
         self.not_l2 = False
         self.signing_length = 256
         self.xml_path = None
+        self.sd_card = False
 
         self.make_dir_path = None
 
@@ -241,7 +244,8 @@ def parse_update_config(xml_path):
     else:
         UPDATE_LOGGER.print_log("XML file does not exist! xml path: %s" %
                                 xml_path, UPDATE_LOGGER.ERROR_LOG)
-        return False, False, False, False, False, False, False
+        ret_params = [False, False, False, False, False, False, False]
+        return ret_params
     xml_content_dict = xmltodict.parse(xml_str, encoding='utf-8')
     package_dict = xml_content_dict.get('package', {})
     head_dict = package_dict.get('head', {}).get('info')
@@ -260,7 +264,8 @@ def parse_update_config(xml_path):
     if isinstance(component_info, OrderedDict):
         component_info = [component_info]
     if component_info is None:
-        return [], {}, [], [], '', [], False
+        ret_params = [[], {}, [], [], '', [], False]
+        return ret_params
     for component in component_info:
         component_list = list(component.values())
         component_list.pop()
@@ -270,7 +275,8 @@ def parse_update_config(xml_path):
             UPDATE_LOGGER.print_log("This component %s  repeats!" %
                                     component['@compAddr'],
                                     UPDATE_LOGGER.ERROR_LOG)
-            return False, False, False, False, False, False, False
+            ret_params = [False, False, False, False, False, False, False]
+            return ret_params
 
         if component['@compType'] == '0':
             whole_list.append(component['@compAddr'])
@@ -284,10 +290,16 @@ def parse_update_config(xml_path):
             two_step = True
 
     UPDATE_LOGGER.print_log('XML file parsing completed!')
-
-    return head_list, component_dict, \
-        whole_list, difference_list, package_version, \
-        full_image_path_list, two_step
+    if OPTIONS_MANAGER.sd_card:
+        whole_list = SD_CARD_IMAGE_LIST
+        difference_list = []
+        full_image_path_list = \
+            [os.path.join(OPTIONS_MANAGER.target_package_dir, "%s.img" % each)
+             for each in SD_CARD_IMAGE_LIST]
+    ret_params = [head_list, component_dict,
+                  whole_list, difference_list, package_version,
+                  full_image_path_list, two_step]
+    return ret_params
 
 
 def partitions_conversion(data):
@@ -382,6 +394,8 @@ def clear_options():
     OPTIONS_MANAGER.not_l2 = False
     OPTIONS_MANAGER.signing_length = 256
     OPTIONS_MANAGER.xml_path = None
+    OPTIONS_MANAGER.sd_card = False
+
     OPTIONS_MANAGER.full_image_path_list = []
 
     OPTIONS_MANAGER.make_dir_path = None

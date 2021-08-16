@@ -17,7 +17,7 @@ import os
 import subprocess
 import unittest
 
-from image_class import SparseImage
+from image_class import IncUpdateImage
 from image_class import FullUpdateImage
 from test.create_package_data import create_input_package
 from test.create_package_data import clear_package
@@ -57,58 +57,6 @@ class TestImage(unittest.TestCase):
         self.assertEqual(check_re, True)
         clear_package("test_target_package")
 
-    def test_parse_sparse_image_file(self):
-        """
-        parse_sparse_image_file，sparse image image_flag False
-        :return:
-        """
-        create_input_package("test_target_package", package_type="source")
-        image_path = 'vendor.img'
-        with open(image_path, 'wb') as w_f:
-            with open('./test_target_package/vendor.img', "rb") as\
-                    r_f:
-                r_f.seek(10)
-                content = r_f.read()
-            w_f.write(content)
-        map_path = 'vendor.map'
-        s_image_obj = SparseImage(image_path, map_path)
-        clear_resource()
-        if os.path.exists(image_path):
-            os.remove(image_path)
-        self.assertEqual(s_image_obj.image_flag, False)
-        clear_package("test_target_package")
-
-    def test_parse_chunk_info(self):
-        """
-        parse_chunk_info，chunk_type
-        :return:
-        """
-        create_input_package("test_target_package", package_type="source")
-        f_r = open('./test_target_package/vendor.img', 'rb')
-        check_re = SparseImage.parse_chunk_info(
-            4096, [], (0xCAC1, 0, 1, 12), f_r, [], 0)
-        self.assertEqual(check_re, False)
-
-        check_re = SparseImage.parse_chunk_info(
-            4096, [], (0xCAC2, 0, 0, 12), f_r, [], 0)
-        self.assertEqual(type(check_re), int)
-
-        check_re = SparseImage.parse_chunk_info(
-            4096, [], (0xCAC3, 0, 0, 3645456), f_r, [], 0)
-        self.assertEqual(check_re, False)
-
-        check_re = SparseImage.parse_chunk_info(
-            4096, [], (0xCAC4, 0, 0, 3645456), f_r, [], 0)
-        self.assertEqual(check_re, False)
-
-        check_re = SparseImage.parse_chunk_info(
-            4096, [], (0xCAC5, 0, 0, 3645456), f_r, [], 0)
-        self.assertEqual(check_re, False)
-
-        clear_resource()
-        f_r.close()
-        clear_package("test_target_package")
-
     def test_get_file_data(self):
         """
         get_file_data，file_pos is None
@@ -118,13 +66,13 @@ class TestImage(unittest.TestCase):
         f_r = open('./test_target_package/vendor.img', 'rb')
         default_zero_block = ('\0' * 4096).encode()
         fill_data = ('\0' * 4096).encode()[:4]
-        check_re = SparseImage.get_file_data(
+        check_re = IncUpdateImage.get_file_data(
             4096, 0, default_zero_block, 0,
             None, fill_data, f_r)
         self.assertEqual(check_re, default_zero_block)
 
         fill_data = ('\1' * 4096).encode()[:4]
-        check_re = SparseImage.get_file_data(
+        check_re = IncUpdateImage.get_file_data(
             4096, 0, default_zero_block, 0,
             None, fill_data, f_r)
         self.assertEqual(check_re, None)
@@ -142,7 +90,7 @@ class TestImage(unittest.TestCase):
         data = ('\0' * 4096).encode()
         zero_blocks_list, nonzero_blocks_list, nonzero_groups_list = [], [], []
         zero_blocks_list, nonzero_blocks_list, nonzero_groups_list = \
-            SparseImage.get_zero_nonzero_blocks_list(
+            IncUpdateImage.get_zero_nonzero_blocks_list(
                 data, default_zero_block, 1, nonzero_blocks_list,
                 nonzero_groups_list, zero_blocks_list)
         check_re = len(zero_blocks_list) != 0
@@ -152,7 +100,7 @@ class TestImage(unittest.TestCase):
         zero_blocks_list, nonzero_blocks_list, nonzero_groups_list = \
             [], [0] * 4096, []
         zero_blocks_list, nonzero_blocks_list, nonzero_groups_list = \
-            SparseImage.get_zero_nonzero_blocks_list(
+            IncUpdateImage.get_zero_nonzero_blocks_list(
                 data, default_zero_block, 1, nonzero_blocks_list,
                 nonzero_groups_list, zero_blocks_list)
         check_re = len(nonzero_groups_list) != 0
@@ -170,7 +118,7 @@ class TestImage(unittest.TestCase):
         reserved_blocks = BlocksManager("0")
         temp_file_map = {}
         temp_file_map = \
-            SparseImage.get_file_map(
+            IncUpdateImage.get_file_map(
                 nonzero_blocks_list, nonzero_groups_list, reserved_blocks,
                 temp_file_map, zero_blocks_list)
         check_re = len(temp_file_map) != 0
@@ -187,12 +135,12 @@ class TestImage(unittest.TestCase):
         image_path = "./test_target_package/vendor.img"
         map_path = "./test_target_package/vendor.map"
         cmd = ["e2fsdroid", "-B", map_path,
-               "-a", "/vendor", image_path]
+               "-a", "/vendor", image_path, "-e"]
         sub_p = subprocess.Popen(
             cmd, shell=False, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT)
         sub_p.wait()
-        ranges_list = SparseImage(image_path, map_path).\
+        ranges_list = IncUpdateImage(image_path, map_path).\
             get_ranges(BlocksManager("2"))
         check_re = len(ranges_list) != 0
         self.assertEqual(check_re, True)
@@ -209,12 +157,12 @@ class TestImage(unittest.TestCase):
         image_path = "./test_target_package/vendor.img"
         map_path = "./test_target_package/vendor.map"
         cmd = ["e2fsdroid", "-B", map_path,
-               "-a", "/vendor", image_path]
+               "-a", "/vendor", image_path, "-e"]
         sub_p = subprocess.Popen(
             cmd, shell=False, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT)
         sub_p.wait()
-        s_image = SparseImage(image_path, map_path)
+        s_image = IncUpdateImage(image_path, map_path)
         s_image.offset_value_list = [[39, 0, None, 10]]
         ranges_list = s_image.get_ranges(BlocksManager("2"))
         check_re = len(ranges_list) != 0
