@@ -365,7 +365,8 @@ class TestUpdateUtils(unittest.TestCase):
 
         # miss target .img
         check_re = increment_image_processing(
-            verse_script, ['vendor'], "./test_target_package/", "")
+            verse_script, ['vendor'], "./test_target_package/",
+            "./test_target_package/")
         self.assertEqual(check_re, False)
 
         with open('vendor.img', 'w') as f_w:

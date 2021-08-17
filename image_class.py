@@ -24,18 +24,12 @@ from log_exception import UPDATE_LOGGER
 from blocks_manager import BlocksManager
 from utils import SPARSE_IMAGE_MAGIC
 from utils import HEADER_INFO_FORMAT
-from utils import CHUNK_INFO_FORMAT
 from utils import HEADER_INFO_LEN
-from utils import CHUNK_INFO_LEN
 from utils import EXTEND_VALUE
 from utils import FILE_MAP_ZERO_KEY
 from utils import FILE_MAP_NONZERO_KEY
 from utils import FILE_MAP_COPY_KEY
 from utils import MAX_BLOCKS_PER_GROUP
-from utils import CHUNK_TYPE_RAW
-from utils import CHUNK_TYPE_FILL
-from utils import CHUNK_TYPE_DONT_CARE
-from utils import CHUNK_TYPE_CRC32
 
 
 class FullUpdateImage:
@@ -130,22 +124,24 @@ def is_sparse_image(img_path):
             header_info = struct.unpack(HEADER_INFO_FORMAT, image_content)
         except struct.error:
             return False
-        *_, is_sparse = SparseImage.image_header_info_check(header_info)
+        is_sparse = IncUpdateImage.image_header_info_check(header_info)[-1]
+    if is_sparse:
+        UPDATE_LOGGER.print_log("Sparse image is not supported!")
+        raise RuntimeError
     return is_sparse
 
 
-class SparseImage:
+class IncUpdateImage:
     """
-    Sparse image class
+    Increment update image class
     """
 
     def __init__(self, image_path, map_path):
         """
-        Initialize the sparse image.
+        Initialize the inc image.
         :param image_path: img file path
         :param map_path: map file path
         """
-        self.image_flag = True
         self.image_path = image_path
         self.offset_value_list = []
         self.care_block_range = None
@@ -163,37 +159,29 @@ class SparseImage:
         :param image_path: img file path
         :param map_path: map file path
         """
+        self.block_size = block_size = 4096
+        self.total_blocks = total_blocks = \
+            os.path.getsize(self.image_path) // self.block_size
+        reference = b'\0' * self.block_size
         with open(image_path, 'rb') as f_r:
-            image_content = f_r.read(HEADER_INFO_LEN)
-            header_info = struct.unpack(HEADER_INFO_FORMAT, image_content)
-
-            block_size, chunk_header_info_size, header_info_size, magic_info, \
-                total_blocks, total_chunks, self.image_flag = \
-                self.image_header_info_check(header_info)
-            self.block_size = block_size
-            self.total_blocks = total_blocks
-
-            if self.image_flag is False:
-                UPDATE_LOGGER.print_log(
-                    "This image is not a sparse image! path: %s" % image_path,
-                    UPDATE_LOGGER.ERROR_LOG)
-                return
-
-            UPDATE_LOGGER.print_log("Sparse head info parsing completed!")
-
-            pos_value = 0
             care_value_list, offset_value_list = [], []
+            nonzero_blocks = []
+            for i in range(self.total_blocks):
+                blocks_data = f_r.read(self.block_size)
+                if blocks_data != reference:
+                    nonzero_blocks.append(i)
+                    nonzero_blocks.append(i + 1)
+            self.care_block_range = BlocksManager(nonzero_blocks)
+            care_value_list = list(self.care_block_range.range_data)
+            for idx, value in enumerate(care_value_list):
+                if idx != 0 and (idx + 1) % 2 == 0:
+                    be_value = int(care_value_list[idx - 1])
+                    af_value = int(care_value_list[idx])
+                    file_tell = be_value * block_size
+                    offset_value_list.append(
+                        (be_value, af_value - be_value,
+                         file_tell, None))
 
-            for _ in range(total_chunks):
-                chunk_info_content = f_r.read(CHUNK_INFO_LEN)
-                chunk_info = struct.unpack(
-                    CHUNK_INFO_FORMAT, chunk_info_content)
-                pos_value = self.parse_chunk_info(
-                    block_size, care_value_list, chunk_info, f_r,
-                    offset_value_list, pos_value)
-                if pos_value is False:
-                    raise RuntimeError
-            self.care_block_range = BlocksManager(care_value_list)
             self.offset_index = [i[0] for i in offset_value_list]
             self.offset_value_list = offset_value_list
             extended_range = \
@@ -203,70 +191,6 @@ class SparseImage:
                 extended_range.get_intersect_with_other(all_blocks). \
                 get_subtract_with_other(self.care_block_range)
             self.parse_block_map_file(map_path, f_r)
-
-    @staticmethod
-    def parse_chunk_info(*args):
-        """
-        Parse the chunk information.
-        :return pos_value: pos
-        """
-        block_size, care_value_list, chunk_info, f_r, \
-            offset_value_list, pos_value = args
-        chunk_type = chunk_info[0]
-        # Chunk quantity
-        chunk_size = chunk_info[2]
-        total_size = chunk_info[3]
-        data_size = total_size - 12
-
-        # Chunk type, which can be CHUNK_TYPE_RAW, CHUNK_TYPE_FILL,
-        # CHUNK_TYPE_DONT_CARE, or CHUNK_TYPE_CRC32.
-        if chunk_type == CHUNK_TYPE_RAW:
-            if data_size != chunk_size * block_size:
-                UPDATE_LOGGER.print_log(
-                    "chunk_size * block_size: %u and "
-                    "data size: %u is not equal!" %
-                    (data_size, chunk_size * block_size),
-                    UPDATE_LOGGER.ERROR_LOG)
-                return False
-            else:
-                temp_value = pos_value + chunk_size
-                care_value_list.append(pos_value)
-                care_value_list.append(temp_value)
-                offset_value_list.append(
-                    (pos_value, chunk_size, f_r.tell(), None))
-                pos_value = temp_value
-                f_r.seek(data_size, os.SEEK_CUR)
-
-        elif chunk_type == CHUNK_TYPE_FILL:
-            temp_value = pos_value + chunk_size
-            fill_data = f_r.read(4)
-            care_value_list.append(pos_value)
-            care_value_list.append(temp_value)
-            offset_value_list.append((pos_value, chunk_size, None, fill_data))
-            pos_value = temp_value
-
-        elif chunk_type == CHUNK_TYPE_DONT_CARE:
-            if data_size != 0:
-                UPDATE_LOGGER.print_log(
-                    "CHUNK_TYPE_DONT_CARE chunk data_size"
-                    " must be 0, data size: (%u)" %
-                    data_size, UPDATE_LOGGER.ERROR_LOG)
-                return False
-            else:
-                pos_value += chunk_size
-
-        elif chunk_type == CHUNK_TYPE_CRC32:
-            UPDATE_LOGGER.print_log(
-                "Not supported chunk type CHUNK_TYPE_CRC32!",
-                UPDATE_LOGGER.ERROR_LOG)
-            return False
-
-        else:
-            UPDATE_LOGGER.print_log(
-                "Not supported chunk type 0x%04X !" %
-                chunk_type, UPDATE_LOGGER.ERROR_LOG)
-            return False
-        return pos_value
 
     def parse_block_map_file(self, map_path, image_file_r):
         """
@@ -426,16 +350,32 @@ class SparseImage:
         return data
 
     def range_sha256(self, ranges):
+        """
+        range sha256 hash content
+        :param ranges: ranges value
+        :return:
+        """
         hash_obj = sha256()
         for data in self.__get_blocks_set_data(ranges):
             hash_obj.update(data)
         return hash_obj.hexdigest()
 
     def write_range_data_2_fd(self, ranges, file_obj):
+        """
+        write range data to fd
+        :param ranges: ranges obj
+        :param file_obj: file obj
+        :return:
+        """
         for data in self.__get_blocks_set_data(ranges):
             file_obj.write(data)
 
     def get_ranges(self, ranges):
+        """
+        get ranges value
+        :param ranges: ranges
+        :return: ranges value
+        """
         return [each_data for each_data in self.__get_blocks_set_data(ranges)]
 
     def __get_blocks_set_data(self, blocks_set_data):
@@ -500,89 +440,23 @@ class SparseImage:
         total_chunks = header_info[7]
         if magic_info != SPARSE_IMAGE_MAGIC:
             UPDATE_LOGGER.print_log(
-                "SparseImage head Magic should be 0xED26FF3A!",
-                UPDATE_LOGGER.WARNING_LOG)
+                "SparseImage head Magic should be 0xED26FF3A!")
             image_flag = False
         if major_version != 1 or minor_version != 0:
             UPDATE_LOGGER.print_log(
                 "SparseImage Only supported major version with "
-                "minor version 1.0!",
-                UPDATE_LOGGER.WARNING_LOG)
+                "minor version 1.0!")
             image_flag = False
         if header_info_size != 28:
             UPDATE_LOGGER.print_log(
                 "SparseImage header info size must be 28! size: %u." %
-                header_info_size, UPDATE_LOGGER.WARNING_LOG)
+                header_info_size)
             image_flag = False
         if chunk_header_info_size != 12:
             UPDATE_LOGGER.print_log(
                 "SparseImage Chunk header size mast to be 12! size: %u." %
-                chunk_header_info_size, UPDATE_LOGGER.WARNING_LOG)
+                chunk_header_info_size)
             image_flag = False
-        return block_size, chunk_header_info_size, header_info_size, \
-            magic_info, total_blocks, total_chunks, image_flag
-
-
-class RawImage:
-    """
-    Image class for raw image file.
-    """
-
-    def __init__(self, path):
-        self.path = path
-        self.block_size = 4096
-        file_size = os.path.getsize(self.path)
-        self.__fd = open(self.path, 'rb')
-
-        if file_size % self.block_size != 0:
-            UPDATE_LOGGER.print_log(
-                "Size of file %s must be multiple of %d bytes!"
-                % (self.path, self.block_size), UPDATE_LOGGER.ERROR_LOG)
-            raise ValueError()
-
-        self.total_blocks = file_size // self.block_size
-        self.care_block_range = \
-            BlocksManager(range_data=(0, self.total_blocks))
-        self.clobbered_blocks = BlocksManager()
-        self.extended_range = BlocksManager()
-        zero_blocks = []
-        nonzero_blocks = []
-        reference = b'\0' * self.block_size
-        for i in range(self.total_blocks):
-            blocks_data = self.__fd.read(self.block_size)
-            if blocks_data == reference:
-                zero_blocks.append(i)
-                zero_blocks.append(i + 1)
-            else:
-                nonzero_blocks.append(i)
-                nonzero_blocks.append(i + 1)
-
-        self.file_map = {}
-        if zero_blocks:
-            self.file_map[FILE_MAP_ZERO_KEY] = \
-                BlocksManager(range_data=zero_blocks)
-        if nonzero_blocks:
-            self.file_map[FILE_MAP_NONZERO_KEY] = \
-                BlocksManager(range_data=nonzero_blocks)
-
-    def __del__(self):
-        self.__fd.close()
-
-    def __get_blocks_set_data(self, ranges):
-        """
-        Get the range data.
-        """
-        for s, e in ranges:
-            self.__fd.seek(s * self.block_size)
-            for _ in range(s, e):
-                yield self.__fd.read(self.block_size)
-
-    def range_sha256(self, ranges):
-        hash_obj = sha256()
-        for data in self.__get_blocks_set_data(ranges):
-            hash_obj.update(data)
-        return hash_obj.hexdigest()
-
-    def write_range_data_2_fd(self, ranges, file_obj):
-        for data in self.__get_blocks_set_data(ranges):
-            file_obj.write(data)
+        ret_args = [block_size, chunk_header_info_size, header_info_size,
+                    magic_info, total_blocks, total_chunks, image_flag]
+        return ret_args

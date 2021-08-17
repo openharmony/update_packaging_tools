@@ -19,13 +19,9 @@ import os
 import subprocess
 import tempfile
 import time
-from collections import OrderedDict
-from ctypes import Structure
-from ctypes import c_int
-from ctypes import c_char_p
-from ctypes import c_ubyte
-from ctypes import pointer
-from enum import Enum
+import collections as collect
+import enum
+import ctypes
 
 from log_exception import UPDATE_LOGGER
 from script_generator import create_script
@@ -49,42 +45,42 @@ DIGEST_LEN = 32
 HASH_VALUE_MAX_LEN = 128
 
 
-class SignMethod(Enum):
+class SignMethod(enum.Enum):
     RSA = 1
     ECC = 2
 
 
-class PkgHeader(Structure):
-    _fields_ = [("digest_method", c_ubyte),
-                ("sign_method", c_ubyte),
-                ("pkg_type", c_ubyte),
-                ("pkg_flags", c_ubyte),
-                ("entry_count", c_int),
-                ("update_file_version", c_int),
-                ("product_update_id", c_char_p),
-                ("software_version", c_char_p),
-                ("date", c_char_p),
-                ("time", c_char_p),
-                ("describe_package_id", c_char_p)]
+class PkgHeader(ctypes.Structure):
+    _fields_ = [("digest_method", ctypes.c_ubyte),
+                ("sign_method", ctypes.c_ubyte),
+                ("pkg_type", ctypes.c_ubyte),
+                ("pkg_flags", ctypes.c_ubyte),
+                ("entry_count", ctypes.c_int),
+                ("update_file_version", ctypes.c_int),
+                ("product_update_id", ctypes.c_char_p),
+                ("software_version", ctypes.c_char_p),
+                ("date", ctypes.c_char_p),
+                ("time", ctypes.c_char_p),
+                ("describe_package_id", ctypes.c_char_p)]
 
 
-class PkgComponent(Structure):
-    _fields_ = [("digest", c_ubyte * DIGEST_LEN),
-                ("file_path", c_char_p),
-                ("component_addr", c_char_p),
-                ("version", c_char_p),
-                ("size", c_int),
-                ("id", c_int),
-                ("original_size", c_int),
-                ("res_type", c_ubyte),
-                ("type", c_ubyte),
-                ("flags", c_ubyte)]
+class PkgComponent(ctypes.Structure):
+    _fields_ = [("digest", ctypes.c_ubyte * DIGEST_LEN),
+                ("file_path", ctypes.c_char_p),
+                ("component_addr", ctypes.c_char_p),
+                ("version", ctypes.c_char_p),
+                ("size", ctypes.c_int),
+                ("id", ctypes.c_int),
+                ("original_size", ctypes.c_int),
+                ("res_type", ctypes.c_ubyte),
+                ("type", ctypes.c_ubyte),
+                ("flags", ctypes.c_ubyte)]
 
 
-class SignInfo (Structure):
-    _fields_ = [("sign_offset", c_int),
-                ("hash_len", c_int),
-                ("hash_code", c_ubyte * (HASH_VALUE_MAX_LEN + 1))]
+class SignInfo(ctypes.Structure):
+    _fields_ = [("sign_offset", ctypes.c_int),
+                ("hash_len", ctypes.c_int),
+                ("hash_code", ctypes.c_ubyte * (HASH_VALUE_MAX_LEN + 1))]
 
 
 def create_update_bin():
@@ -116,7 +112,7 @@ def create_update_bin():
     else:
         all_image_name = \
             incremental_img_list + full_img_list
-    sort_component_dict = OrderedDict()
+    sort_component_dict = collect.OrderedDict()
     for each_image_name in all_image_name:
         sort_component_dict[each_image_name] = \
             component_dict.get(each_image_name)
@@ -136,14 +132,14 @@ def create_update_bin():
     lib_l1 = get_lib_api(is_l2=False)
     if OPTIONS_MANAGER.not_l2:
         lib_l1.CreatePackageWithSignInfo(
-            pointer(head_list), component_list, save_patch,
-            private_key, pointer(sign_info))
+            ctypes.pointer(head_list), component_list, save_patch,
+            private_key, ctypes.pointer(sign_info))
 
         offset = sign_info.sign_offset
         hash_code = bytes(sign_info.hash_code).decode('ascii')
     else:
         lib.CreatePackage(
-            pointer(head_list), component_list, save_patch,
+            ctypes.pointer(head_list), component_list, save_patch,
             OPTIONS_MANAGER.private_key.encode("utf-8"))
         offset = 0
         hash_code = b""
@@ -197,7 +193,7 @@ def get_component_list(all_image_file_obj_list, component_dict):
         if component is None:
             component = copy.copy(COMPONENT_INFO_INNIT)
             component[0] = key
-        component_list[idx].digest = (c_ubyte * 32).from_buffer_copy(
+        component_list[idx].digest = (ctypes.c_ubyte * 32).from_buffer_copy(
             binascii.a2b_hex(digest.encode('utf-8')))
         component_list[idx].file_path = file_path.encode("utf-8")
         if not OPTIONS_MANAGER.not_l2:
@@ -255,7 +251,7 @@ def get_head_list(component_count, head_value_list):
     head_list.software_version = head_value_list[2].encode("utf-8")
     head_list.date = head_value_list[3].encode("utf-8")
     head_list.time = head_value_list[4].encode("utf-8")
-    head_list.describe_package_id = c_char_p("update/info.bin".encode())
+    head_list.describe_package_id = ctypes.c_char_p("update/info.bin".encode())
     return head_list
 
 
@@ -407,7 +403,7 @@ def create_build_tools_zip(lib):
         private_key = OPTIONS_MANAGER.private_key.encode("utf-8")
 
     lib.CreatePackage(
-        pointer(head_list), component_list, file_save_patch,
+        ctypes.pointer(head_list), component_list, file_save_patch,
         private_key)
     return file_obj
 
@@ -483,12 +479,12 @@ def build_update_package(no_zip, update_package, prelude_script,
         lib_l1 = get_lib_api(is_l2=False)
         if OPTIONS_MANAGER.not_l2:
             lib_l1.CreatePackageWithSignInfo(
-                pointer(head_list), component_list,
+                ctypes.pointer(head_list), component_list,
                 update_package_path.encode("utf-8"),
-                private_key, pointer(sign_info))
+                private_key, ctypes.pointer(sign_info))
         else:
             lib.CreatePackage(
-                pointer(head_list), component_list,
+                ctypes.pointer(head_list), component_list,
                 update_package_path.encode("utf-8"),
                 OPTIONS_MANAGER.private_key.encode("utf-8"))
 

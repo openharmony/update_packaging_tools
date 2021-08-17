@@ -255,9 +255,7 @@ class PatchProcess:
             src_file_obj)
         OPTIONS_MANAGER.incremental_temp_file_obj_list.append(
             tgt_file_obj)
-        do_pkg_diff = True if \
-            each_action.tgt_name.split(".")[-1].lower() in \
-            ("zip", "gz", "lz4", "hap") else False
+        do_pkg_diff = True
         try:
             patch_value, do_pkg_diff = self.apply_compute_patch(
                 src_file_obj.name, tgt_file_obj.name, do_pkg_diff)
@@ -484,7 +482,8 @@ class PatchProcess:
             patch_file_obj)
         cmd = [DIFF_EXE_PATH] if pkgdiff else [DIFF_EXE_PATH, '-b', '1']
 
-        cmd.extend(['-s', src_file, '-d', tgt_file, '-p', patch_file_obj.name])
+        cmd.extend(['-s', src_file, '-d', tgt_file,
+                    '-p', patch_file_obj.name, '-l', '4096'])
         sub_p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                  stderr=subprocess.STDOUT)
         output, _ = sub_p.communicate()

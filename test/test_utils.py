@@ -26,7 +26,6 @@ from utils import parse_update_config
 from utils import get_update_info
 from utils import VERSION_MBN_PATH
 from utils import BOARD_LIST_PATH
-from utils import get_lib_api
 from utils import UPDATER_CONFIG
 from utils import parse_partition_file_xml
 from patch_package_process import PatchProcess
@@ -83,14 +82,14 @@ class TestUtils(unittest.TestCase):
         check_re = parse_update_config("test.xml")
         clear_resource()
         self.assertEqual(
-            check_re, (False, False, False, False, False, False, False))
+            check_re, [False, False, False, False, False, False, False])
 
         OPTIONS_MANAGER.target_package_dir = "./"
         check_re = parse_update_config(
             "./updater_specified_config_repeats.xml")
         clear_resource()
         self.assertEqual(
-            check_re, (False, False, False, False, False, False, False))
+            check_re, [False, False, False, False, False, False, False])
         if os.path.exists("./updater_specified_config_repeats.xml"):
             os.remove("./updater_specified_config_repeats.xml")
 

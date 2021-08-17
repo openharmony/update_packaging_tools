@@ -42,6 +42,7 @@ optional arguments:
                         The signing content length
                         supported by the tool include ['256', '384'].
   -xp, --xml_path       XML file path.
+  -sc, --sd_card        SD Card mode, Create update package for SD Card.
 """
 import filecmp
 import os
@@ -50,12 +51,12 @@ import subprocess
 
 import xmltodict
 
+import patch_package_process
+
 from gigraph_process import GigraphProcess
 from image_class import FullUpdateImage
 from image_class import is_sparse_image
-from image_class import RawImage
-from image_class import SparseImage
-from patch_package_process import PatchProcess
+from image_class import IncUpdateImage
 from transfers_manager import TransfersManager
 from log_exception import UPDATE_LOGGER
 from script_generator import PreludeScript
@@ -178,6 +179,9 @@ def create_entrance_args():
                              "['256', '384'].")
     parser.add_argument("-xp", "--xml_path", type=private_key_check,
                         default=None, help="XML file path.")
+    parser.add_argument("-sc", "--sd_card", action='store_true',
+                        help="SD Card mode, "
+                             "Create update package for SD Card.")
 
     args = parser.parse_args()
     source_package = args.source_package
@@ -203,9 +207,13 @@ def create_entrance_args():
     OPTIONS_MANAGER.signing_length = signing_length
     xml_path = args.xml_path
     OPTIONS_MANAGER.xml_path = xml_path
+    sd_card = args.sd_card
+    OPTIONS_MANAGER.sd_card = sd_card
 
-    return source_package, target_package, update_package, no_zip, not_l2, \
-        partition_file, signing_algorithm, hash_algorithm, private_key
+    ret_args = [source_package, target_package, update_package,
+                no_zip, not_l2, partition_file, signing_algorithm,
+                hash_algorithm, private_key]
+    return ret_args
 
 
 def get_script_obj():
@@ -447,9 +455,13 @@ def increment_image_processing(
             clear_resource(err_clear=True)
             return False
 
+        src_is_sparse = is_sparse_image(each_src_image_path)
+        tgt_is_sparse = is_sparse_image(each_tgt_image_path)
         check_make_map_path(each_img)
         cmd = ["e2fsdroid", "-B", each_src_map_path,
                "-a", "/%s" % each_img, each_src_image_path]
+        if not src_is_sparse:
+            cmd.append("-e")
         sub_p = subprocess.Popen(
             cmd, shell=False, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT)
@@ -469,6 +481,8 @@ def increment_image_processing(
 
         cmd = ["e2fsdroid", "-B", each_tgt_map_path,
                "-a", "/%s" % each_img, each_tgt_image_path]
+        if not tgt_is_sparse:
+            cmd.append("-e")
         sub_p = subprocess.Popen(
             cmd, shell=False, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT)
@@ -482,17 +496,11 @@ def increment_image_processing(
                 UPDATE_LOGGER.ERROR_LOG)
             clear_resource(err_clear=True)
             return False
-        src_is_sparse = is_sparse_image(each_src_image_path)
-        tgt_is_sparse = is_sparse_image(each_tgt_image_path)
-        if src_is_sparse and tgt_is_sparse:
+        if not src_is_sparse and not tgt_is_sparse:
             src_image_class = \
-                SparseImage(each_src_image_path, each_src_map_path)
+                IncUpdateImage(each_src_image_path, each_src_map_path)
             tgt_image_class = \
-                SparseImage(each_tgt_image_path, each_tgt_map_path)
-            
-        elif not src_is_sparse and not tgt_is_sparse:
-            src_image_class = RawImage(each_src_image_path)
-            tgt_image_class = RawImage(each_tgt_image_path)
+                IncUpdateImage(each_tgt_image_path, each_tgt_map_path)
         else:
             raise RuntimeError
 
@@ -504,9 +512,9 @@ def increment_image_processing(
         graph_process = GigraphProcess(actions_list, src_image_class,
                                        tgt_image_class)
         actions_list = graph_process.actions_list
-        patch_process = PatchProcess(each_img, tgt_image_class,
-                                     src_image_class,
-                                     actions_list)
+        patch_process = \
+            patch_package_process.PatchProcess(
+                each_img, tgt_image_class, src_image_class, actions_list)
         patch_process.patch_process()
         patch_process.package_patch_zip.package_patch_zip()
         patch_process.write_script(each_img, script_check_cmd_list,
@@ -578,6 +586,14 @@ def check_make_map_path(each_img):
 
 def incremental_processing(no_zip, partition_file, source_package,
                            verse_script):
+    """
+    Incremental processing.
+    :param no_zip: no zip mode
+    :param partition_file: partition xml file path
+    :param source_package: source package path
+    :param verse_script: verse script obj
+    :return : processing result
+    """
     if len(OPTIONS_MANAGER.incremental_img_list) != 0:
         if check_incremental_args(no_zip, partition_file, source_package,
                                   OPTIONS_MANAGER.incremental_img_list) \
@@ -588,9 +604,24 @@ def incremental_processing(no_zip, partition_file, source_package,
                 OPTIONS_MANAGER.source_package_dir,
                 OPTIONS_MANAGER.target_package_dir) is False:
             return False
+    else:
+        if source_package is not None:
+            UPDATE_LOGGER.print_log(
+                "There is no incremental image, "
+                "the - S parameter is not required!",
+                UPDATE_LOGGER.ERROR_LOG)
+            raise RuntimeError
 
 
 def check_args(private_key, source_package, target_package, update_package):
+    """
+    Input args check.
+    :param private_key: private key path
+    :param source_package: source package path
+    :param target_package: target package path
+    :param update_package: output package path
+    :return : Judgment result
+    """
     if source_package is False or private_key is False or \
             target_package is False or update_package is False:
         return False
@@ -616,14 +647,24 @@ def main():
         create_entrance_args()
     if not_l2:
         no_zip = True
+    if OPTIONS_MANAGER.sd_card:
+        if source_package is not None or \
+                OPTIONS_MANAGER.xml_path is not None or \
+                partition_file is not None:
+            UPDATE_LOGGER.print_log(
+                "SD Card updater, "
+                "the -S/-xp/-pf parameter is not required!",
+                UPDATE_LOGGER.ERROR_LOG)
+            raise RuntimeError
     if check_args(private_key, source_package,
                   target_package, update_package) is False:
         clear_resource(err_clear=True)
         return
 
-    if check_userdata_image() is False:
-        clear_resource(err_clear=True)
-        return
+    if not OPTIONS_MANAGER.sd_card:
+        if check_userdata_image() is False:
+            clear_resource(err_clear=True)
+            return
 
     # Create a Script object.
     prelude_script, verse_script, refrain_script, ending_script = \
