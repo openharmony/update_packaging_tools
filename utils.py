@@ -329,8 +329,9 @@ def parse_partition_file_xml(xml_path):
     else:
         UPDATE_LOGGER.print_log("XML file does not exist! xml path: %s" %
                                 xml_path, UPDATE_LOGGER.ERROR_LOG)
-        return False, False
+        return False, False, False
     partitions_list = []
+    partitions_file_path_list = []
     xml_content_dict = xmltodict.parse(xml_str, encoding='utf-8')
     part_list = xml_content_dict['Partition_Info']['Part']
     new_part_list = []
@@ -342,10 +343,13 @@ def parse_partition_file_xml(xml_path):
                 "Partition file parsing failed! part_name: %s, xml_path: %s" %
                 (part.get('@PartitionName'), xml_path),
                 UPDATE_LOGGER.ERROR_LOG)
-            return False, False
+            return False, False, False
 
         if part.get('@PartitionName') not in IGNORED_PARTITION_LIST:
             partitions_list.append(part.get('@PartitionName'))
+            partitions_file_path_list.append(
+                os.path.join(OPTIONS_MANAGER.target_package_dir,
+                             "%s.img" % part.get('@PartitionName')))
         part_dict = {'start': start_value,
                      'length': length_value,
                      'partName': part.get('@PartitionName'),
@@ -356,7 +360,7 @@ def parse_partition_file_xml(xml_path):
     file_obj = tempfile.NamedTemporaryFile(prefix="partition_file-", mode='wb')
     file_obj.write(part_json.encode())
     file_obj.seek(0)
-    return file_obj, partitions_list
+    return file_obj, partitions_list, partitions_file_path_list
 
 
 def expand_component(component_dict):

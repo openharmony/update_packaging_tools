@@ -154,7 +154,7 @@ class TestUtils(unittest.TestCase):
         check_re = parse_partition_file_xml(
             "./partition_file_conversion_failed.xml")
         clear_resource()
-        self.assertEqual(check_re, (False, False))
+        self.assertEqual(check_re, (False, False, False))
         if os.path.exists("./partition_file_conversion_failed.xml"):
             os.remove("./partition_file_conversion_failed.xml")
 

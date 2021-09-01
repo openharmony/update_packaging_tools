@@ -676,13 +676,14 @@ def main():
         updater_partitions_cmd = verse_script.updater_partitions()
         verse_script.add_command(updater_partitions_cmd)
 
-        partition_file_obj, partitions_list = \
+        partition_file_obj, partitions_list, partitions_file_path_list = \
             parse_partition_file_xml(partition_file)
         if partition_file_obj is False:
             clear_resource(err_clear=True)
             return False
         OPTIONS_MANAGER.partition_file_obj = partition_file_obj
         OPTIONS_MANAGER.full_img_list = partitions_list
+        OPTIONS_MANAGER.full_image_path_list = partitions_file_path_list
         OPTIONS_MANAGER.two_step = False
 
     # Upgrade the updater image.
