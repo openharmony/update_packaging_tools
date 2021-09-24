@@ -109,15 +109,14 @@ class TestScriptGenerator(unittest.TestCase):
         """
         file_path = "./vendor.img"
         create_file(file_path, get_target_vendor_data())
-        file_obj = open(file_path)
-        OPTIONS_MANAGER.two_step = True
-        OPTIONS_MANAGER.full_img_list = []
-        OPTIONS_MANAGER.incremental_img_list = ['vendor', 'updater']
-        OPTIONS_MANAGER.incremental_image_file_obj_list = [file_obj]
-        progress_value_dict = get_progress_value(distributable_value=60)
-        check_re = len(progress_value_dict) != 0
-        self.assertEqual(check_re, True)
-        file_obj.close()
+        with open(file_path) as file_obj:
+            OPTIONS_MANAGER.two_step = True
+            OPTIONS_MANAGER.full_img_list = []
+            OPTIONS_MANAGER.incremental_img_list = ['vendor', 'updater']
+            OPTIONS_MANAGER.incremental_image_file_obj_list = [file_obj]
+            progress_value_dict = get_progress_value(distributable_value=60)
+            check_re = len(progress_value_dict) != 0
+            self.assertEqual(check_re, True)
         if os.path.exists(file_path):
             os.remove(file_path)
 
