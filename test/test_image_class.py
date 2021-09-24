@@ -63,22 +63,21 @@ class TestImage(unittest.TestCase):
         :return:
         """
         create_input_package("test_target_package", package_type="source")
-        f_r = open('./test_target_package/vendor.img', 'rb')
-        default_zero_block = ('\0' * 4096).encode()
-        fill_data = ('\0' * 4096).encode()[:4]
-        check_re = IncUpdateImage.get_file_data(
-            4096, 0, default_zero_block, 0,
-            None, fill_data, f_r)
-        self.assertEqual(check_re, default_zero_block)
+        with open('./test_target_package/vendor.img', 'rb') as f_r:
+            default_zero_block = ('\0' * 4096).encode()
+            fill_data = ('\0' * 4096).encode()[:4]
+            check_re = IncUpdateImage.get_file_data(
+                4096, 0, default_zero_block, 0,
+                None, fill_data, f_r)
+            self.assertEqual(check_re, default_zero_block)
 
-        fill_data = ('\1' * 4096).encode()[:4]
-        check_re = IncUpdateImage.get_file_data(
-            4096, 0, default_zero_block, 0,
-            None, fill_data, f_r)
-        self.assertEqual(check_re, None)
+            fill_data = ('\1' * 4096).encode()[:4]
+            check_re = IncUpdateImage.get_file_data(
+                4096, 0, default_zero_block, 0,
+                None, fill_data, f_r)
+            self.assertEqual(check_re, None)
 
         clear_resource()
-        f_r.close()
         clear_package("test_target_package")
 
     def test_get_blocks_list(self):
