@@ -79,7 +79,7 @@ class FullUpdateImage:
                 else:
                     raw_image_write_cmd = \
                         self.__verse_script.raw_image_write(
-                            each_name)
+                            each_name, each_name)
                     cmd = '%s_WRITE_FLAG%s' % (
                         each_name, raw_image_write_cmd)
                 if each_name not in ("boot", "updater_boot",

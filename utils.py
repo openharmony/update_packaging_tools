@@ -90,6 +90,8 @@ PER_BLOCK_SIZE = 4096
 TWO_STEP = "updater"
 
 SD_CARD_IMAGE_LIST = ["system", "vendor", "userdata"]
+# Image file mount to partition, Correspondence dict.
+IMAGE_FILE_MOUNT_TO_PARTITION_DICT = {"userdata": "data"}
 
 
 def singleton(cls):
