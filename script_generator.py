@@ -26,6 +26,7 @@ from decimal import Decimal
 from log_exception import VendorExpandError
 from log_exception import UPDATE_LOGGER
 from utils import OPTIONS_MANAGER
+from utils import IMAGE_FILE_MOUNT_TO_PARTITION_DICT
 from utils import PARTITION_FILE
 from utils import TWO_STEP
 from utils import TOTAL_SCRIPT_FILE_NAME
@@ -165,14 +166,18 @@ class VerseScript(Script):
         cmd = 'sparse_image_write("/%s");\n' % partition
         return cmd
 
-    def raw_image_write(self, partition):
+    def raw_image_write(self, partition, image_file_name):
         """
         Get the raw_image_write command.
         :param partition:  image name
+        :param image_file_name:  image file name
         :return:
         """
-        cmd = 'raw_image_write("/%s");\n' % partition
+        if partition in IMAGE_FILE_MOUNT_TO_PARTITION_DICT.keys():
+            partition = IMAGE_FILE_MOUNT_TO_PARTITION_DICT.get(partition)
+        cmd = 'raw_image_write("/%s", "/%s");\n' % (partition, image_file_name)
         return cmd
+
 
     def get_status(self):
         """
