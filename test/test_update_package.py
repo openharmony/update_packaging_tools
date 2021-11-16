@@ -57,7 +57,8 @@ class TestUpdatePackage(unittest.TestCase):
             w_f.write('test content')
         with open(BOARD_LIST_PATH, 'w') as w_f:
             w_f.write('test content')
-        OPTIONS_MANAGER.full_image_file_obj_list = [open(VERSION_MBN_PATH)]
+        with open(VERSION_MBN_PATH) as om_first_f:
+            OPTIONS_MANAGER.full_image_file_obj_list = [om_first_f]
         OPTIONS_MANAGER.full_img_list = ['vendor']
         OPTIONS_MANAGER.incremental_img_list = []
         OPTIONS_MANAGER.hash_algorithm = 'test_algo'
@@ -78,7 +79,8 @@ class TestUpdatePackage(unittest.TestCase):
             "./test_target_package/updater_config"
         OPTIONS_MANAGER.target_package_dir = \
             "./test_target_package/"
-        OPTIONS_MANAGER.total_script_file_obj = open(VERSION_MBN_PATH)
+        with open(VERSION_MBN_PATH) as om_second_f:
+            OPTIONS_MANAGER.total_script_file_obj = om_second_f
         OPTIONS_MANAGER.full_img_list = []
         OPTIONS_MANAGER.opera_script_file_name_dic = {}
         OPTIONS_MANAGER.private_key = "../"
@@ -96,7 +98,8 @@ class TestUpdatePackage(unittest.TestCase):
         OPTIONS_MANAGER.target_package_config_dir = ""
         OPTIONS_MANAGER.target_package_dir = \
             "./test_target_package/"
-        OPTIONS_MANAGER.total_script_file_obj = open(VERSION_MBN_PATH)
+        with open(VERSION_MBN_PATH) as om_third_f:
+            OPTIONS_MANAGER.total_script_file_obj = om_third_f
         OPTIONS_MANAGER.full_img_list = []
         OPTIONS_MANAGER.opera_script_file_name_dic = {}
         OPTIONS_MANAGER.private_key = "../"
