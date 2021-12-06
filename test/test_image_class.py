@@ -63,7 +63,8 @@ class TestImage(unittest.TestCase):
         :return:
         """
         create_input_package("test_target_package", package_type="source")
-        f_r = open('./test_target_package/vendor.img', 'rb')
+        with open('./test_target_package/vendor.img', 'rb') as wo_f:
+            f_r = wo_f
         default_zero_block = ('\0' * 4096).encode()
         fill_data = ('\0' * 4096).encode()[:4]
         check_re = IncUpdateImage.get_file_data(

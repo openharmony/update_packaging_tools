@@ -109,7 +109,8 @@ class TestScriptGenerator(unittest.TestCase):
         """
         file_path = "./vendor.img"
         create_file(file_path, get_target_vendor_data())
-        file_obj = open(file_path)
+        with open(file_path) as wo_f:
+            file_obj = wo_f
         OPTIONS_MANAGER.two_step = True
         OPTIONS_MANAGER.full_img_list = []
         OPTIONS_MANAGER.incremental_img_list = ['vendor', 'updater']
