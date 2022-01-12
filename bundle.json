@@ -18,8 +18,8 @@
         "packaging",
         "tools"
     ],
-    "envs": [],
-    "dirs": [],
+    "envs": {},
+    "dirs": {},
     "author": {
         "name": "",
         "email": "",
