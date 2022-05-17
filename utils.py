@@ -24,9 +24,9 @@ import tempfile
 import zipfile
 from collections import OrderedDict
 
-import xmltodict
 from copy import copy
 from ctypes import cdll
+import xmltodict
 from cryptography.hazmat.primitives import hashes
 from log_exception import UPDATE_LOGGER
 
