@@ -17,12 +17,12 @@ import os
 import unittest
 from collections import OrderedDict
 
+from test.create_package_data import create_input_package
+from test.create_package_data import clear_package
 from utils import OPTIONS_MANAGER
 from utils import clear_resource
 from utils import VERSION_MBN_PATH
 from utils import BOARD_LIST_PATH
-from test.create_package_data import create_input_package
-from test.create_package_data import clear_package
 from update_package import get_hash_content
 from update_package import signing_package
 from script_generator import PreludeScript
