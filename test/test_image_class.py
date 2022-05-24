@@ -17,10 +17,10 @@ import os
 import subprocess
 import unittest
 
-from image_class import IncUpdateImage
-from image_class import FullUpdateImage
 from test.create_package_data import create_input_package
 from test.create_package_data import clear_package
+from image_class import IncUpdateImage
+from image_class import FullUpdateImage
 from script_generator import VerseScript
 from utils import clear_resource
 from blocks_manager import BlocksManager
