@@ -525,7 +525,7 @@ def get_hash_content(file_path, hash_algorithm):
         return None
     if not os.path.exists(file_path):
         UPDATE_LOGGER.print_log(
-            "%s failed!" % LINUX_HASH_ALGORITHM_DICT[hash_algorithm],
+            "%s failed!" % LINUX_HASH_ALGORITHM_DICT.get(hash_algorithm),
             UPDATE_LOGGER.ERROR_LOG)
         raise RuntimeError
     process_obj = subprocess.Popen(
