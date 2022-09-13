@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021 Huawei Device Co., Ltd.
@@ -26,7 +26,6 @@ from decimal import Decimal
 from log_exception import VendorExpandError
 from log_exception import UPDATE_LOGGER
 from utils import OPTIONS_MANAGER
-from utils import IMAGE_FILE_MOUNT_TO_PARTITION_DICT
 from utils import PARTITION_FILE
 from utils import TWO_STEP
 from utils import TOTAL_SCRIPT_FILE_NAME
@@ -59,8 +58,14 @@ class Script:
     def sha_check(self, *args, **kwargs):
         raise VendorExpandError(type(self), 'sha_check')
 
+    def image_sha_check(self, *args, **kwargs):
+        raise VendorExpandError(type(self), 'image_sha_check')
+
     def first_block_check(self, *args, **kwargs):
         raise VendorExpandError(type(self), 'first_block_check')
+
+    def image_patch(self, *args, **kwargs):
+        raise VendorExpandError(type(self), 'image_patch')
 
     def abort(self, *args, **kwargs):
         raise VendorExpandError(type(self), 'abort')
@@ -70,9 +75,6 @@ class Script:
 
     def block_update(self, *args, **kwargs):
         raise VendorExpandError(type(self), 'block_update')
-
-    def sparse_image_write(self, *args, **kwargs):
-        raise VendorExpandError(type(self), 'sparse_image_write')
 
     def raw_image_write(self, *args, **kwargs):
         raise VendorExpandError(type(self), 'raw_image_write')
@@ -113,6 +115,22 @@ class VerseScript(Script):
             expected_sha=expected_sha, partition=partition)
         return cmd
 
+    def image_sha_check(self, partition, src_size, src_hash,
+        dst_size, dst_hash):
+        """
+        Get the image_sha_check command.
+        :param ranges_str: ranges string
+        :param expected_sha: hash value
+        :param partition: image name
+        :return:
+        """
+        cmd = ('image_sha_check("/{partition}", '
+                '"{src_size}", "{src_hash}", '
+                '"{dst_size}", "{dst_hash}")').format(
+                partition=partition, src_size=src_size, src_hash=src_hash,
+                dst_size=dst_size, dst_hash=dst_hash)
+        return cmd
+
     def first_block_check(self, partition):
         """
         Get the first_block_check command.
@@ -146,6 +164,18 @@ class VerseScript(Script):
             start_progress=start_progress, dur=dur)
         return cmd
 
+    def image_patch(self, partition, src_size, src_hash, target_size, target_hash):
+        """
+        Get the image_patch command.
+        :param partition:  image name
+        :return:
+        """
+        cmd = 'image_patch("/{partition}", "{src_size}", ' \
+              '"{src_hash}", "{target_size}", "{target_hash}", ' \
+              '"{partition}.patch.dat");\n'.format(partition=partition, src_size=src_size,
+              src_hash=src_hash, target_size=target_size, target_hash=target_hash)
+        return cmd
+
     def block_update(self, partition):
         """
         Get the block_update command.
@@ -157,27 +187,17 @@ class VerseScript(Script):
               '"{partition}.patch.dat");\n'.format(partition=partition)
         return cmd
 
-    def sparse_image_write(self, partition):
-        """
-        Get the sparse_image_write command.
-        :param partition:  image name
-        :return:
-        """
-        cmd = 'sparse_image_write("/%s");\n' % partition
-        return cmd
+    def image_write(self, partition, image_name, image_path):
+        return self.raw_image_write(partition, image_name)
 
-    def raw_image_write(self, partition, image_file_name):
+    def raw_image_write(self, partition, image_name):
         """
         Get the raw_image_write command.
         :param partition:  image name
-        :param image_file_name:  image file name
         :return:
         """
-        if partition in IMAGE_FILE_MOUNT_TO_PARTITION_DICT.keys():
-            partition = IMAGE_FILE_MOUNT_TO_PARTITION_DICT.get(partition)
-        cmd = 'raw_image_write("/%s", "/%s");\n' % (partition, image_file_name)
+        cmd = 'raw_image_write("/%s", "/%s");\n' % (partition, image_name)
         return cmd
-
 
     def get_status(self):
         """

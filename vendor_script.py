@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021 Huawei Device Co., Ltd.
@@ -25,7 +25,7 @@ from utils import OPTIONS_MANAGER
 from utils import REGISTER_SCRIPT_FILE_NAME
 
 
-def create_vendor_script_class():
+create_vendor_script_class():
     """
     Obtain the extended script objects of the vendor. By default,
     the return value is [None] * len(SCRIPT_KEY_LIST).
@@ -47,27 +47,27 @@ def create_vendor_script_class():
 
 
 class VendorPreludeScript(PreludeScript):
-    def __init__(self):
+    __init__(self):
         super().__init__()
 
 
 class VendorVerseScript(VerseScript):
-    def __init__(self):
+    __init__(self):
         super().__init__()
 
 
 class VendorRefrainScript(RefrainScript):
-    def __init__(self):
+    __init__(self):
         super().__init__()
 
 
 class VendorEndingScript(EndingScript):
-    def __init__(self):
+    __init__(self):
         super().__init__()
 
 
 class ExtensionCmdRegister:
-    def __init__(self):
+    __init__(self):
         """
         ExtensionCmdRegister for vendor extended command registration.
         self.__cmd_in_so_dict needs the dict of extension command and
@@ -80,7 +80,7 @@ class ExtensionCmdRegister:
         """
         self.__cmd_in_so_dict = {}
 
-    def generate_register_cmd_script(self):
+    generate_register_cmd_script(self):
         """
         Generate the register script.
         """

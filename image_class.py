@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021 Huawei Device Co., Ltd.
@@ -22,14 +22,13 @@ from hashlib import sha256
 
 from log_exception import UPDATE_LOGGER
 from blocks_manager import BlocksManager
-from utils import SPARSE_IMAGE_MAGIC
-from utils import HEADER_INFO_FORMAT
-from utils import HEADER_INFO_LEN
+from utils import OPTIONS_MANAGER
 from utils import EXTEND_VALUE
 from utils import FILE_MAP_ZERO_KEY
 from utils import FILE_MAP_NONZERO_KEY
 from utils import FILE_MAP_COPY_KEY
 from utils import MAX_BLOCKS_PER_GROUP
+from utils import FORBIDEN_UPDATE_IMAGE_LIST
 
 
 class FullUpdateImage:
@@ -37,13 +36,16 @@ class FullUpdateImage:
     Full image processing class
     """
 
-    def __init__(self, target_package_images_dir, full_img_list, verse_script,
-                 full_image_path_list, no_zip=False):
-        self.__target_package_images_dir = target_package_images_dir
-        self.__full_img_list = full_img_list
-        self.__verse_script = verse_script
-        self.__full_image_path_list = full_image_path_list
-        self.__no_zip = no_zip
+    def __init__(self, target_package_images_dir,
+                 full_img_list, full_img_name_list,
+                 verse_script, full_image_path_list,
+                 no_zip=False):
+        self.target_package_images_dir = target_package_images_dir
+        self.full_img_list = full_img_list
+        self.full_img_name_list = full_img_name_list
+        self.verse_script = verse_script
+        self.full_image_path_list = full_image_path_list
+        self.no_zip = no_zip
 
     def update_full_image(self):
         """
@@ -53,43 +55,35 @@ class FullUpdateImage:
         """
         full_image_file_obj_list = []
         full_image_content_len_list = []
-        for idx, each_name in enumerate(self.__full_img_list):
+        for idx, each_name in enumerate(self.full_img_list):
             full_image_content = self.get_full_image_content(
-                self.__full_image_path_list[idx])
+                self.full_image_path_list[idx])
+            img_name = self.full_img_name_list[idx][:-4]
             if full_image_content is False:
                 UPDATE_LOGGER.print_log(
                     "Get full image content failed!",
                     log_type=UPDATE_LOGGER.ERROR_LOG)
                 return False, False
             each_img = tempfile.NamedTemporaryFile(
-                prefix="full_image%s" % each_name, mode='wb')
+                dir=self.target_package_images_dir,
+                prefix="full_image%s" % img_name, mode='wb')
             each_img.write(full_image_content)
             each_img.seek(0)
             full_image_content_len_list.append(len(full_image_content))
             full_image_file_obj_list.append(each_img)
             UPDATE_LOGGER.print_log(
-                "Image %s full processing completed" % each_name)
-            if not self.__no_zip:
+                "Image %s full processing completed" % img_name)
+            if not self.no_zip:
                 # No zip mode (no script command)
-                if is_sparse_image(each_img.name):
-                    sparse_image_write_cmd = \
-                        self.__verse_script.sparse_image_write(each_name)
-                    cmd = '%s_WRITE_FLAG%s' % (
-                        each_name, sparse_image_write_cmd)
-                else:
-                    raw_image_write_cmd = \
-                        self.__verse_script.raw_image_write(
-                            each_name, each_name)
-                    cmd = '%s_WRITE_FLAG%s' % (
-                        each_name, raw_image_write_cmd)
-                if each_name not in ("boot", "updater_boot",
-                                     "updater", "updater_b"):
-                    self.__verse_script.add_command(
-                        cmd=cmd)
+                image_write_cmd = \
+                    self.verse_script.image_write(each_name, img_name, each_img.name)
+                cmd = '%s_WRITE_FLAG%s' % (each_name, image_write_cmd)
+                if each_name not in FORBIDEN_UPDATE_IMAGE_LIST:
+                    self.verse_script.add_command(cmd=cmd)
 
         UPDATE_LOGGER.print_log(
             "All full image processing completed! image count: %d" %
-            len(self.__full_img_list))
+            len(self.full_img_list))
         return full_image_content_len_list, full_image_file_obj_list
 
     @staticmethod
@@ -112,25 +106,6 @@ class FullUpdateImage:
         return content
 
 
-def is_sparse_image(img_path):
-    """
-    Check whether the image is a sparse image.
-    :param img_path: image path
-    :return:
-    """
-    with open(img_path, 'rb') as f_r:
-        image_content = f_r.read(HEADER_INFO_LEN)
-        try:
-            header_info = struct.unpack(HEADER_INFO_FORMAT, image_content)
-        except struct.error:
-            return False
-        is_sparse = IncUpdateImage.image_header_info_check(header_info)[-1]
-    if is_sparse:
-        UPDATE_LOGGER.print_log("Sparse image is not supported!")
-        raise RuntimeError
-    return is_sparse
-
-
 class IncUpdateImage:
     """
     Increment update image class
@@ -143,6 +118,7 @@ class IncUpdateImage:
         :param map_path: map file path
         """
         self.image_path = image_path
+        self.map_path = map_path
         self.offset_value_list = []
         self.care_block_range = None
         self.extended_range = None
@@ -151,9 +127,9 @@ class IncUpdateImage:
         self.offset_index = []
         self.block_size = None
         self.total_blocks = None
-        self.parse_sparse_image_file(image_path, map_path)
+        self.parse_raw_image_file(image_path, map_path)
 
-    def parse_sparse_image_file(self, image_path, map_path):
+    def parse_raw_image_file(self, image_path, map_path):
         """
         Parse the .img file.
         :param image_path: img file path
@@ -410,53 +386,3 @@ class IncUpdateImage:
                     else:
                         yield fill_data * (this_read * (self.block_size >> 2))
                     diff_value -= this_read
-
-    @staticmethod
-    def image_header_info_check(header_info):
-        """
-        Check for new messages of the header_info image.
-        :param header_info: header_info
-        :return:
-        """
-        image_flag = True
-        # Sparse mirroring header ID. The magic value is fixed to 0xED26FF3A.
-        magic_info = header_info[0]
-        # major version number
-        major_version = header_info[1]
-        # minor version number
-        minor_version = header_info[2]
-        # Length of the header information.
-        # The value is fixed to 28 characters.
-        header_info_size = header_info[3]
-        # Header information size of the chunk.
-        # The length is fixed to 12 characters.
-        chunk_header_info_size = header_info[4]
-        # Number of bytes of a block. The default size is 4096.
-        block_size = header_info[5]
-        # Total number of blocks contained in the current image
-        # (number of blocks in a non-sparse image)
-        total_blocks = header_info[6]
-        # Total number of chunks contained in the current image
-        total_chunks = header_info[7]
-        if magic_info != SPARSE_IMAGE_MAGIC:
-            UPDATE_LOGGER.print_log(
-                "SparseImage head Magic should be 0xED26FF3A!")
-            image_flag = False
-        if major_version != 1 or minor_version != 0:
-            UPDATE_LOGGER.print_log(
-                "SparseImage Only supported major version with "
-                "minor version 1.0!")
-            image_flag = False
-        if header_info_size != 28:
-            UPDATE_LOGGER.print_log(
-                "SparseImage header info size must be 28! size: %u." %
-                header_info_size)
-            image_flag = False
-        if chunk_header_info_size != 12:
-            UPDATE_LOGGER.print_log(
-                "SparseImage Chunk header size mast to be 12! size: %u." %
-                chunk_header_info_size)
-            image_flag = False
-        ret_args = [block_size, chunk_header_info_size, header_info_size,
-                    magic_info, total_blocks, total_chunks, image_flag]
-        return ret_args
