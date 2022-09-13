@@ -102,12 +102,12 @@ class CreatePackage(object):
         try:
             # Type is 1 for package header in TLV format
             header_tlv = struct.pack(TLV_FMT, self.header_tlv_type, UPGRADE_PKG_HEADER_SIZE)
-            pkg_Info_Length = \
+            pkg_info_length = \
                 UPGRADE_RESERVE_LEN + TLV_SIZE + TLV_SIZE + TLV_SIZE + \
                 UPGRADE_PKG_HEADER_SIZE + UPGRADE_PKG_TIME_SIZE + \
                 self.upgrade_compinfo_size * self.head_list.entry_count
             upgrade_pkg_header = struct.pack(
-                UPGRADE_PKG_HEADER_FMT, pkg_Info_Length, self.head_list.update_file_version,
+                UPGRADE_PKG_HEADER_FMT, pkg_info_length, self.head_list.update_file_version,
                 self.head_list.product_update_id, self.head_list.software_version)
 
             # Type is 2 for time in TLV format
@@ -223,7 +223,7 @@ class CreatePackage(object):
                 key_data,
                 password=None,
                 backend=default_backend())
-            signature = private_key.sign(digset,padding.PKCS1v15(), hashes.SHA256())
+            signature = private_key.sign(digset, padding.PKCS1v15(), hashes.SHA256())
         except (OSError, ValueError):
             return False
         return signature
@@ -298,7 +298,7 @@ class CreatePackage(object):
                     "Add descriptPackageId failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
                 return False
             try:
-            # Sign
+                # Sign
                 self.sign_offset = self.compinfo_offset + UPGRADE_RESERVE_LEN
                 package_file.seek(self.sign_offset)
                 sign_buffer = bytes(UPGRADE_SIGNATURE_LEN)

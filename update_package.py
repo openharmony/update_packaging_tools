@@ -49,6 +49,7 @@ SIGNING_LENGTH_256 = 256
 DIGEST_LEN = 32
 HASH_VALUE_MAX_LEN = 128
 
+
 class SignMethod(enum.Enum):
     RSA = 1
     ECC = 2
@@ -402,7 +403,7 @@ def build_update_package(no_zip, update_package, prelude_script,
         update_file_name = ''.join(
             ["updater_", OPTIONS_MANAGER.target_package_version.replace(" ", "_")])
     else :
-         update_file_name = ''.join(
+        update_file_name = ''.join(
             ["updater_", package_type])
             
     if not no_zip:

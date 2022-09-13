@@ -120,7 +120,7 @@ def create_encap_content_info(diget):
     if not diget:
         UPDATE_LOGGER.print_log("calc package hash failed! file: %s",
             log_type=UPDATE_LOGGER.ERROR_LOG)
-        return
+        return False
     content_header = struct.pack(CONTENT_INFO_FORMAT, DIGEST_SHA256,
         SHA256_HASH_LEN, diget)
     return content_header
