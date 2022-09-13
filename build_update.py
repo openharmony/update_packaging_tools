@@ -503,13 +503,13 @@ def generate_image_map_file(image_path, map_path, image_name):
 def get_file_sha256(update_package):
     sha256obj = hashlib.sha256()
     maxbuf = 8192
-    f = open(update_package, 'rb')
+    package_file = open(update_package, 'rb')
     while True:
-        buf = f.read(maxbuf)
+        buf = package_file.read(maxbuf)
         if not buf:
             break
         sha256obj.update(buf)
-    f.close()
+    package_file.close()
     hash_value = sha256obj.hexdigest()
     return str(hash_value).upper()
 

@@ -34,7 +34,7 @@ CERT_PATH = os.path.join(operation_path, 'sign_cert/signing_cert.crt')
 BLCOK_SIZE = 8192
 FOOTER_LENGTH = 6
 ZIP_ECOD_LENGTH = 22
-DIGEST_SHA256 = 672;
+DIGEST_SHA256 = 672
 SHA256_HASH_LEN = 32
 
 CONTENT_INFO_FORMAT = "<2H32s"
@@ -45,8 +45,8 @@ SIGANTURE_FOOTER_FORMAT = "<3H"
 
 
 def load_public_cert():
-    with open(CERT_PATH, 'rb') as f:
-        der_bytes = f.read()
+    with open(CERT_PATH, 'rb') as cert_file:
+        der_bytes = cert_file.read()
         if pem.detect(der_bytes):
             type_name, headers, der_bytes = pem.unarmor(der_bytes)
 
@@ -57,18 +57,18 @@ def calculate_package_hash(package_path):
     """
     :return: (hash) for path using hashlib.sha256()
     """
-    h = hashlib.sha256()
+    hash_sha256 = hashlib.sha256()
     length = 0
 
     remain_len = os.path.getsize(package_path) - ZIP_ECOD_LENGTH
-    with open(package_path, 'rb') as f:
+    with open(package_path, 'rb') as package_file:
         while remain_len > BLCOK_SIZE:
-            h.update(f.read(BLCOK_SIZE))
+            hash_sha256.update(package_file.read(BLCOK_SIZE))
             remain_len -= BLCOK_SIZE
         if remain_len > 0:
-            h.update(f.read(remain_len))
+            hash_sha256.update(package_file.read(remain_len))
 
-    return h.digest()
+    return hash_sha256.digest()
 
 
 def sign_digest_with_pss(digset, private_key_file):
@@ -133,8 +133,8 @@ def write_signed_package(unsigned_package, signature, signed_package):
     signature_size = len(signature)
     signature_total_size = signature_size + FOOTER_LENGTH
 
-    fd = os.open(signed_package, os.O_RDWR | os.O_CREAT, 0o777)
-    f_signed = os.fdopen(fd, 'wb')
+    package_file = os.open(signed_package, os.O_RDWR | os.O_CREAT, 0o777)
+    f_signed = os.fdopen(package_file, 'wb')
 
     remain_len = os.path.getsize(unsigned_package) - 2
     with open(unsigned_package, 'rb') as f_unsign:

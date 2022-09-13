@@ -186,16 +186,16 @@ class CreatePackage(object):
         return True
 
     def calculate_hash(self, package_file):
-        h = hashlib.sha256()
+        hash_sha256 = hashlib.sha256()
         remain_len = self.component_offset
 
         package_file.seek(0)
         while remain_len > BLCOK_SIZE:
-            h.update(package_file.read(BLCOK_SIZE))
+            hash_sha256.update(package_file.read(BLCOK_SIZE))
             remain_len -= BLCOK_SIZE
         if remain_len > 0:
-            h.update(package_file.read(remain_len))
-        return h.digest()
+            hash_sha256.update(package_file.read(remain_len))
+        return hash_sha256.digest()
 
     def sign_digest_with_pss(self, digset):
         try:
