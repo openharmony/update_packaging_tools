@@ -393,17 +393,17 @@ def build_update_package(no_zip, update_package, prelude_script,
         return False
 
     if OPTIONS_MANAGER.sd_card :
-        type = "sd"
+        package_type = "sd"
     elif OPTIONS_MANAGER.source_package :
-        type = "diff"
+        package_type = "diff"
     else :
-        type = "full"
+        package_type = "full"
     if OPTIONS_MANAGER.not_l2:
         update_file_name = ''.join(
             ["updater_", OPTIONS_MANAGER.target_package_version.replace(" ", "_")])
     else :
          update_file_name = ''.join(
-            ["updater_", type])
+            ["updater_", package_type])
             
     if not no_zip:
         update_package_path = os.path.join(

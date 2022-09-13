@@ -500,7 +500,7 @@ def generate_image_map_file(image_path, map_path, image_name):
     return True
 
 
-def getFileSHA256(update_package):
+def get_File_SHA256(update_package):
     sha256obj = hashlib.sha256()
     maxbuf = 8192
     f = open(update_package, 'rb')
@@ -510,8 +510,8 @@ def getFileSHA256(update_package):
             break
         sha256obj.update(buf)
     f.close()
-    hash = sha256obj.hexdigest()
-    return str(hash).upper()
+    hash_value = sha256obj.hexdigest()
+    return str(hash_value).upper()
 
 
 def write_image_patch_script(partition, src_image_path, tgt_image_path,
@@ -524,9 +524,9 @@ def write_image_patch_script(partition, src_image_path, tgt_image_path,
     :param verse_script: verse script object
     :return:
     """
-    src_sha = getFileSHA256(src_image_path)
+    src_sha = get_File_SHA256(src_image_path)
     src_size = os.path.getsize(src_image_path)
-    tgt_sha = getFileSHA256(tgt_image_path)
+    tgt_sha = get_File_SHA256(tgt_image_path)
     tgt_size = os.path.getsize(tgt_image_path)
 
     sha_check_cmd = verse_script.image_sha_check(partition,
@@ -544,8 +544,8 @@ def write_image_patch_script(partition, src_image_path, tgt_image_path,
     script_check_cmd_list.append(cmd)
 
     image_patch_cmd = verse_script.image_patch(partition, os.path.getsize(src_image_path),
-        getFileSHA256(src_image_path), os.path.getsize(tgt_image_path),
-        getFileSHA256(tgt_image_path))
+        get_File_SHA256(src_image_path), os.path.getsize(tgt_image_path),
+        get_File_SHA256(tgt_image_path))
 
     cmd = '%s_WRITE_FLAG%s' % (partition, image_patch_cmd)
     script_write_cmd_list.append(cmd)
@@ -652,9 +652,9 @@ def increment_image_processing(
         OPTIONS_MANAGER.src_image = src_image_class
         OPTIONS_MANAGER.tgt_image = tgt_image_class
 
-        IncImage = OPTIONS_MANAGER.init.invoke_event(INC_IMAGE_EVENT)
-        if IncImage:
-            src_image_class, tgt_image_class = IncImage()
+        Inc_Image = OPTIONS_MANAGER.init.invoke_event(INC_IMAGE_EVENT)
+        if Inc_Image:
+            src_image_class, tgt_image_class = Inc_Image()
 
         transfers_manager = TransfersManager(
             each_img, tgt_image_class, src_image_class)

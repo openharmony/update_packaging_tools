@@ -102,12 +102,12 @@ class CreatePackage(object):
         try:
             # Type is 1 for package header in TLV format
             header_tlv = struct.pack(TLV_FMT, self.header_tlv_type, UPGRADE_PKG_HEADER_SIZE)
-            pkgInfoLength = \
+            pkg_Info_Length = \
                 UPGRADE_RESERVE_LEN + TLV_SIZE + TLV_SIZE + TLV_SIZE + \
                 UPGRADE_PKG_HEADER_SIZE + UPGRADE_PKG_TIME_SIZE + \
                 self.upgrade_compinfo_size * self.head_list.entry_count
             upgrade_pkg_header = struct.pack(
-                UPGRADE_PKG_HEADER_FMT, pkgInfoLength, self.head_list.update_file_version,
+                UPGRADE_PKG_HEADER_FMT, pkg_Info_Length, self.head_list.update_file_version,
                 self.head_list.product_update_id, self.head_list.software_version)
 
             # Type is 2 for time in TLV format
@@ -179,7 +179,7 @@ class CreatePackage(object):
                 package_file.write(component_data)
                 component_len = len(component_data)
                 self.component_offset += component_len
-        except:
+        except IOError:
             return False
         UPDATE_LOGGER.print_log("Write component complete  ComponentSize:%s"\
             % component_len)
@@ -232,7 +232,7 @@ class CreatePackage(object):
         with open(self.save_path, "rb+") as package_file:
             # calculate hash for .bin package
             digest = self.calculate_hash(package_file)
-            if digest == False:
+            if not digest:
                 UPDATE_LOGGER.print_log("calculate hash for .bin package failed",
                     log_type=UPDATE_LOGGER.ERROR_LOG)
                 return False
@@ -245,7 +245,7 @@ class CreatePackage(object):
             else:
                 UPDATE_LOGGER.print_log("invalid sign_algo!", log_type=UPDATE_LOGGER.ERROR_LOG)
                 return False
-            if signature == False:
+            if not signature:
                 UPDATE_LOGGER.print_log("sign .bin package failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
                 return False
 
@@ -281,20 +281,19 @@ class CreatePackage(object):
             for i in range(0, self.head_list.entry_count):
                 UPDATE_LOGGER.print_log("Add component %s"
                     % self.component_list[i].component_addr)
-                with open(self.component_list[i].file_path, "rb") as component_file:
-                    if not self.write_component_info(self.component_list[i], package_file):
-                        UPDATE_LOGGER.print_log("write component info failed: %s"
-                            % self.component_list[i].component_addr, UPDATE_LOGGER.ERROR_LOG)
-                        return False
-                    if not self.write_component(self.component_list[i], package_file):
-                        UPDATE_LOGGER.print_log("write component failed: %s"
-                            % self.component_list[i].component_addr, UPDATE_LOGGER.ERROR_LOG)
-                        return False
+                if not self.write_component_info(self.component_list[i], package_file):
+                    UPDATE_LOGGER.print_log("write component info failed: %s"
+                        % self.component_list[i].component_addr, UPDATE_LOGGER.ERROR_LOG)
+                    return False
+                if not self.write_component(self.component_list[i], package_file):
+                    UPDATE_LOGGER.print_log("write component failed: %s"
+                        % self.component_list[i].component_addr, UPDATE_LOGGER.ERROR_LOG)
+                    return False
             try:
                 # Add descriptPackageId to package
                 package_file.seek(self.compinfo_offset)
                 package_file.write(self.head_list.describe_package_id)
-            except:
+            except IOError:
                 UPDATE_LOGGER.print_log(
                     "Add descriptPackageId failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
                 return False
@@ -304,7 +303,7 @@ class CreatePackage(object):
                 package_file.seek(self.sign_offset)
                 sign_buffer = bytes(UPGRADE_SIGNATURE_LEN)
                 package_file.write(sign_buffer)
-            except:
+            except IOError:
                 UPDATE_LOGGER.print_log(
                     "Add Sign failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
                 return False
