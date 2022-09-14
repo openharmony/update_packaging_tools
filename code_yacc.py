@@ -33,6 +33,6 @@ if __name__ == '__main__':
 
     gen_script_name = parse_params[0]
     output_path = parse_params[1]
-    check_scripts = subprocess.check_call(
+    parse_scripts = subprocess.check_call(
         [gen_script_name], stdout=subprocess.PIPE, cwd=output_path)
-    print("result:", check_scripts)
+    print("result:", parse_scripts)

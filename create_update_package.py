@@ -267,7 +267,8 @@ class CreatePackage(object):
         if not self.verify_param():
             UPDATE_LOGGER.print_log("verify param failed!", UPDATE_LOGGER.ERROR_LOG)
             return False
-        with open(self.save_path, "wb+") as package_file:
+        package_fd = os.open(self.save_path, os.O_RDWR | os.O_CREAT, 0o755)
+        with os.fdopen(package_fd, "wb+") as package_file:
             # Add information to package
             if not self.write_pkginfo(package_file):
                 UPDATE_LOGGER.print_log(

@@ -142,7 +142,8 @@ class UnpackPackage(object):
         UPDATE_LOGGER.print_log("component offset: %s" % self.component_offset)
         UPDATE_LOGGER.print_log("component size: %s" % component_size)
 
-        with open(image_file_path, "wb") as image_file:
+        image_fd = os.open(image_file_path, os.O_RDWR | os.O_CREAT, 0o755)
+        with os.fdopen(image_fd, "wb") as image_file:
             image_buffer = package_file.read(component_size)
             image_file.write(image_buffer)
 
