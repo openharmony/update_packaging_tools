@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021 Huawei Device Co., Ltd.
@@ -22,13 +22,13 @@ DATA_SIZE = 1374024 * 1024
 
 
 class GigraphProcess(object):
-    def __init__(self, actions_list, src_sparse_image, tgt_sparse_image):
+    def __init__(self, actions_list, src_image, tgt_image):
         self.actions_list = actions_list
         if len(self.actions_list) == 0:
             raise RuntimeError
         self.size_of_source_list = 0
-        self.src_sparse_img_obj = src_sparse_image
-        self.tgt_sparse_img_obj = tgt_sparse_image
+        self.src_img_obj = src_image
+        self.tgt_img_obj = tgt_image
         self.vertices = len(self.actions_list)
         self.data_size = DATA_SIZE
 

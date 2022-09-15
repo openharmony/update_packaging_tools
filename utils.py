@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021 Huawei Device Co., Ltd.
@@ -16,17 +16,18 @@
 """
 Description : Defining constants, common interface
 """
-
+import argparse
 import json
 import os
 import shutil
 import tempfile
+import xmltodict
 import zipfile
-from collections import OrderedDict
 
+from collections import OrderedDict
+from build_pkcs7 import sign_ota_package
 from copy import copy
 from ctypes import cdll
-import xmltodict
 from cryptography.hazmat.primitives import hashes
 from log_exception import UPDATE_LOGGER
 
@@ -45,6 +46,7 @@ XML_FILE_PATH = "updater_specified_config.xml"
 SO_PATH = os.path.join(operation_path, 'lib/libpackage.so')
 SO_PATH_L1 = os.path.join(operation_path, 'lib/libpackageL1.so')
 DIFF_EXE_PATH = os.path.join(operation_path, 'lib/diff')
+E2FSDROID_PATH = os.path.join(operation_path, 'lib/e2fsdroid')
 MISC_INFO_PATH = "misc_info.txt"
 VERSION_MBN_PATH = "VERSION.mbn"
 BOARD_LIST_PATH = "BOARD.list"
@@ -54,16 +56,6 @@ PARTITION_FILE = "partitions_file"
 IGNORED_PARTITION_LIST = ['fastboot', 'boot', 'kernel', 'misc',
                           'updater', 'userdata']
 
-SPARSE_IMAGE_MAGIC = 0xED26FF3A
-# The related data is the original data of blocks set by chunk_size.
-CHUNK_TYPE_RAW = 0xCAC1
-# The related data is 4-byte fill data.
-CHUNK_TYPE_FILL = 0xCAC2
-# The related data is empty.
-CHUNK_TYPE_DONT_CARE = 0xCAC3
-# CRC32 block
-CHUNK_TYPE_CRC32 = 0xCAC4
-
 HASH_ALGORITHM_DICT = {'sha256': hashes.SHA256, 'sha384': hashes.SHA384}
 LINUX_HASH_ALGORITHM_DICT = {'sha256': 'sha256sum', 'sha384': 'sha384sum'}
 HASH_CONTENT_LEN_DICT = {'sha256': 64, 'sha384': 96}
@@ -71,13 +63,6 @@ HASH_CONTENT_LEN_DICT = {'sha256': 64, 'sha384': 96}
 COMPONENT_INFO_INNIT = ['', '000', '00', '0', '0o00']
 
 ON_SERVER = "ON_SERVER"
-
-# The length of the header information of the sparse image is 28 bytes.
-HEADER_INFO_FORMAT = "<I4H4I"
-HEADER_INFO_LEN = 28
-# The length of the chunk information of the sparse image is 12 bytes.
-CHUNK_INFO_FORMAT = "<2H2I"
-CHUNK_INFO_LEN = 12
 
 EXTEND_VALUE = 512
 
@@ -89,9 +74,15 @@ MAX_BLOCKS_PER_GROUP = BLOCK_LIMIT = 1024
 PER_BLOCK_SIZE = 4096
 TWO_STEP = "updater"
 
-SD_CARD_IMAGE_LIST = ["system", "vendor", "userdata"]
-# Image file mount to partition, Correspondence dict.
-IMAGE_FILE_MOUNT_TO_PARTITION_DICT = {"userdata": "data"}
+VERSE_SCRIPT_EVENT = 0
+INC_IMAGE_EVENT = 1
+SIGN_PACKAGE_EVENT = 2
+
+# Image file can not support update.
+FORBIDEN_UPDATE_IMAGE_LIST = ["updater_boot", "updater_b", "ptable"]
+
+# 1000000: max number of function recursion depth
+MAXIMUM_RECURSION_DEPTH = 1000000
 
 
 def singleton(cls):
@@ -105,6 +96,30 @@ def singleton(cls):
     return _singleton
 
 
+class ExtInit:
+    """
+    Init event for ext
+    """
+
+    def __init__(self):
+        self.funs = []
+
+    def reg_event(self, evevt_id, funs):
+            self.funs.append([evevt_id, funs])
+            UPDATE_LOGGER.print_log(
+                'register event %s: %s' % (evevt_id, funs.__name__))
+
+    def invoke_event(self, evevt_id):
+        UPDATE_LOGGER.print_log(self.funs)
+        for event in self.funs:
+            funs = event[1]
+            if event[0] == evevt_id and funs is not None:
+                UPDATE_LOGGER.print_log(
+                    'invoke event %s: %s' % (evevt_id, funs.__name__))
+                return funs
+        return False
+
+
 @singleton
 class OptionsManager:
     """
@@ -112,6 +127,8 @@ class OptionsManager:
     """
 
     def __init__(self):
+        self.init = ExtInit()
+        self.parser = argparse.ArgumentParser()
 
         # Own parameters
         self.product = None
@@ -120,6 +137,7 @@ class OptionsManager:
         self.source_package = None
         self.target_package = None
         self.update_package = None
+        self.unpack_package_path = None
         self.no_zip = False
         self.partition_file = None
         self.signing_algorithm = None
@@ -149,7 +167,9 @@ class OptionsManager:
         self.head_info_list = []
         self.component_info_dict = {}
         self.full_img_list = []
+        self.full_img_name_list = []
         self.incremental_img_list = []
+        self.incremental_img_name_list = []
         self.target_package_version = None
         self.source_package_version = None
         self.two_step = False
@@ -165,6 +185,8 @@ class OptionsManager:
         self.incremental_content_len_list = []
         self.incremental_image_file_obj_list = []
         self.incremental_temp_file_obj_list = []
+        self.src_image = None
+        self.tgt_image = None
 
         # Script parameters
         self.opera_script_file_name_dict = {}
@@ -178,12 +200,12 @@ class OptionsManager:
         self.update_bin_obj = None
         self.build_tools_zip_obj = None
         self.update_package_file_path = None
-
+        self.signed_package = None
 
 OPTIONS_MANAGER = OptionsManager()
 
 
-def unzip_package(package_path, origin='target'):
+unzip_package(package_path, origin='target'):
     """
     Decompress the zip package.
     :param package_path: zip package path
@@ -230,7 +252,27 @@ def unzip_package(package_path, origin='target'):
     return tmp_dir_obj, unzip_dir
 
 
-def parse_update_config(xml_path):
+split_img_name(image_path):
+    """
+    Split the image name by image path
+    :return image name
+    """
+    tmp_path = image_path
+    str_list = tmp_path.split("/")
+
+    return str_list[-1]
+
+
+get_update_config_softversion(mbn_dir, head_info_dict):
+    soft_version_file = head_info_dict.get('softVersionFile')
+    if soft_version_file is not None:
+        mbn_path = os.path.join(mbn_dir, soft_version_file)
+        if os.path.exists(mbn_path):
+            with open(mbn_path, 'r') as mbn_file:
+                head_info_dict['info']["@softVersion"] = mbn_file.read()
+
+
+parse_update_config(xml_path):
     """
     Parse the XML configuration file.
     :param xml_path: XML configuration file path
@@ -250,6 +292,7 @@ def parse_update_config(xml_path):
         return ret_params
     xml_content_dict = xmltodict.parse(xml_str, encoding='utf-8')
     package_dict = xml_content_dict.get('package', {})
+    get_update_config_softversion(OPTIONS_MANAGER.target_package_dir, package_dict.get('head', {}))
     head_dict = package_dict.get('head', {}).get('info')
     package_version = head_dict.get("@softVersion")
     # component
@@ -282,29 +325,27 @@ def parse_update_config(xml_path):
 
         if component['@compType'] == '0':
             whole_list.append(component['@compAddr'])
+            OPTIONS_MANAGER.full_img_name_list.\
+                append(split_img_name(component['#text']))
             tem_path = os.path.join(OPTIONS_MANAGER.target_package_dir,
                                     component.get("#text", None))
             full_image_path_list.append(tem_path)
         elif component['@compType'] == '1':
             difference_list.append(component['@compAddr'])
+            OPTIONS_MANAGER.incremental_img_name_list.\
+                append(split_img_name(component['#text']))
 
         if component['@compAddr'] == TWO_STEP:
             two_step = True
 
     UPDATE_LOGGER.print_log('XML file parsing completed!')
-    if OPTIONS_MANAGER.sd_card:
-        whole_list = SD_CARD_IMAGE_LIST
-        difference_list = []
-        full_image_path_list = \
-            [os.path.join(OPTIONS_MANAGER.target_package_dir, "%s.img" % each)
-             for each in SD_CARD_IMAGE_LIST]
     ret_params = [head_list, component_dict,
                   whole_list, difference_list, package_version,
                   full_image_path_list, two_step]
     return ret_params
 
 
-def partitions_conversion(data):
+partitions_conversion(data):
     """
     Convert the start or length data in the partition table through
     multiply 1024 * 1024 and return the data.
@@ -319,7 +360,7 @@ def partitions_conversion(data):
         return False
 
 
-def parse_partition_file_xml(xml_path):
+parse_partition_file_xml(xml_path):
     """
     Parse the XML configuration file.
     :param xml_path: XML configuration file path
@@ -359,13 +400,14 @@ def parse_partition_file_xml(xml_path):
         new_part_list.append(part_dict)
     part_json = json.dumps(new_part_list)
     part_json = '{"Partition": %s}' % part_json
-    file_obj = tempfile.NamedTemporaryFile(prefix="partition_file-", mode='wb')
+    file_obj = tempfile.NamedTemporaryFile(
+        dir=OPTIONS_MANAGER.target_package_dir, prefix="partition_file-", mode='wb')
     file_obj.write(part_json.encode())
     file_obj.seek(0)
     return file_obj, partitions_list, partitions_file_path_list
 
 
-def expand_component(component_dict):
+expand_component(component_dict):
     """
     Append components such as VERSION.mbn and board list.
     :param component_dict: component information dict
@@ -382,7 +424,7 @@ def expand_component(component_dict):
         component_dict[each] = tmp_info_list
 
 
-def clear_options():
+clear_options():
     """
     Clear OPTIONS_MANAGER.
     """
@@ -451,7 +493,7 @@ def clear_options():
     OPTIONS_MANAGER.update_package_file_path = None
 
 
-def clear_resource(err_clear=False):
+clear_resource(err_clear=False):
     """
     Clear resources, close temporary files, and clear temporary paths.
     :param err_clear: whether to clear errors
@@ -491,7 +533,7 @@ def clear_resource(err_clear=False):
     clear_options()
 
 
-def clear_file_obj(err_clear):
+clear_file_obj(err_clear):
     """
     Clear resources and temporary file objects.
     :param err_clear: whether to clear errors
@@ -527,7 +569,7 @@ def clear_file_obj(err_clear):
         UPDATE_LOGGER.print_log('Resource cleaning completed!')
 
 
-def get_file_content(file_path, file_name=None):
+get_file_content(file_path, file_name=None):
     """
     Read the file content.
     :param file_path: file path
@@ -546,7 +588,7 @@ def get_file_content(file_path, file_name=None):
     return file_content
 
 
-def get_update_info():
+get_update_info():
     """
     Parse the configuration file to obtain the update information.
     :return: update information if any; false otherwise.
@@ -605,20 +647,8 @@ def get_update_info():
     return True
 
 
-def get_lib_api(is_l2=True):
-    """
-    Get the so API.
-    :param is_l2: Is it L2 so
-    :return:
-    """
-    if is_l2:
-        so_path = SO_PATH
-    else:
-        so_path = SO_PATH_L1
-    if not os.path.exists(so_path):
-        UPDATE_LOGGER.print_log(
-            "So does not exist! so path: %s" % so_path,
-            UPDATE_LOGGER.ERROR_LOG)
-        raise RuntimeError
-    lib = cdll.LoadLibrary(so_path)
-    return lib
+sign_package():
+    return sign_ota_package(
+        OPTIONS_MANAGER.update_package_file_path,
+        OPTIONS_MANAGER.signed_package,
+        OPTIONS_MANAGER.private_key)

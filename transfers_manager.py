@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021 Huawei Device Co., Ltd.
@@ -66,10 +66,10 @@ class ActionInfo:
 
 
 class TransfersManager(object):
-    def __init__(self, partition, tgt_sparse_img_obj, src_sparse_img_obj,
+    def __init__(self, partition, tgt_img_obj, src_img_obj,
                  disable_img_diff=False):
-        self.tgt_sparse_img_obj = tgt_sparse_img_obj
-        self.src_sparse_img_obj = src_sparse_img_obj
+        self.tgt_img_obj = tgt_img_obj
+        self.src_img_obj = src_img_obj
         self.partition = partition
         self.disable_img_diff = disable_img_diff
 
@@ -84,7 +84,7 @@ class TransfersManager(object):
     def arrange_source_file(self):
         base_names = {}
         version_patterns = {}
-        for file_name in self.src_sparse_img_obj.file_map.keys():
+        for file_name in self.src_img_obj.file_map.keys():
             base_name, no_version_name = self.simplify_file_name(file_name)
             base_names[base_name] = file_name
             version_patterns[no_version_name] = file_name
@@ -98,13 +98,13 @@ class TransfersManager(object):
         max_size = -1
 
         for tgt_file_name, tgt_blocks in \
-                self.tgt_sparse_img_obj.file_map.items():
+                self.tgt_img_obj.file_map.items():
             if FILE_MAP_ZERO_KEY == tgt_file_name:
                 UPDATE_LOGGER.print_log("Apply ZERO type!")
                 self.action_file_list.append(
                     ActionInfo(
                         ActionType.ZERO, tgt_file_name, FILE_MAP_ZERO_KEY,
-                        tgt_blocks, self.src_sparse_img_obj.
+                        tgt_blocks, self.src_img_obj.
                         file_map.get(FILE_MAP_ZERO_KEY, None)))
                 continue
             if FILE_MAP_COPY_KEY == tgt_file_name:
@@ -113,12 +113,12 @@ class TransfersManager(object):
                     ActionInfo(ActionType.NEW, tgt_file_name,
                                None, tgt_blocks, None))
                 continue
-            if tgt_file_name in self.src_sparse_img_obj.file_map:
+            if tgt_file_name in self.src_img_obj.file_map:
                 UPDATE_LOGGER.print_log("Apply DIFF type!")
                 action_info = ActionInfo(
                     ActionType.DIFFERENT, tgt_file_name, tgt_file_name,
                     tgt_blocks,
-                    self.src_sparse_img_obj.file_map[tgt_file_name])
+                    self.src_img_obj.file_map[tgt_file_name])
                 max_size = action_info.get_max_block_number() \
                     if action_info.get_max_block_number() > \
                     max_size else max_size
@@ -130,7 +130,7 @@ class TransfersManager(object):
                 action_info = ActionInfo(
                     ActionType.DIFFERENT, tgt_file_name, src_file_name,
                     tgt_blocks,
-                    self.src_sparse_img_obj.file_map[src_file_name])
+                    self.src_img_obj.file_map[src_file_name])
                 max_size = action_info.get_max_block_number() if \
                     action_info.get_max_block_number() > max_size else max_size
                 self.action_file_list.append(action_info)

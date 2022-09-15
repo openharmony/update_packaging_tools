@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021 Huawei Device Co., Ltd.
@@ -33,6 +33,6 @@ if __name__ == '__main__':
 
     gen_script_name = parse_params[0]
     output_path = parse_params[1]
-    PARSE_SCRIPTS = subprocess.check_call(
+    parse_scripts = subprocess.check_call(
         [gen_script_name], stdout=subprocess.PIPE, cwd=output_path)
-    print("result:", PARSE_SCRIPTS)
+    print("result:", parse_scripts)

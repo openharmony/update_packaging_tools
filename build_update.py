@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021 Huawei Device Co., Ltd.
@@ -46,16 +46,16 @@ optional arguments:
 """
 import filecmp
 import os
+import sys
 import argparse
 import subprocess
-
+import tempfile
+import hashlib
 import xmltodict
-
 import patch_package_process
 
 from gigraph_process import GigraphProcess
 from image_class import FullUpdateImage
-from image_class import is_sparse_image
 from image_class import IncUpdateImage
 from transfers_manager import TransfersManager
 from log_exception import UPDATE_LOGGER
@@ -64,6 +64,7 @@ from script_generator import VerseScript
 from script_generator import RefrainScript
 from script_generator import EndingScript
 from update_package import build_update_package
+from unpack_updater_package import UnpackPackage
 from utils import OPTIONS_MANAGER
 from utils import UPDATER_CONFIG
 from utils import parse_partition_file_xml
@@ -74,7 +75,15 @@ from utils import XML_FILE_PATH
 from utils import get_update_info
 from utils import SCRIPT_KEY_LIST
 from utils import PER_BLOCK_SIZE
+from utils import E2FSDROID_PATH
+from utils import MAXIMUM_RECURSION_DEPTH
+from utils import VERSE_SCRIPT_EVENT
+from utils import INC_IMAGE_EVENT
+from utils import DIFF_EXE_PATH
+from utils import get_update_config_softversion
 from vendor_script import create_vendor_script_class
+
+sys.setrecursionlimit(MAXIMUM_RECURSION_DEPTH)
 
 
 def type_check(arg):
@@ -132,6 +141,24 @@ def check_update_package(arg):
             return False
     if make_dir_path is not None:
         OPTIONS_MANAGER.make_dir_path = make_dir_path
+    OPTIONS_MANAGER.update_package = arg
+    return arg
+
+
+def unpack_check(arg):
+    """
+    Argument check, which is used to check whether
+    the update package path exists.
+    :param arg: The arg to check.
+    :return: Check result
+    """
+    unpack_package = os.path.join(OPTIONS_MANAGER.update_package, arg)
+    if not os.path.isfile(unpack_package):
+        UPDATE_LOGGER.print_log(
+            "FileNotFoundError, path: %s" % unpack_package, UPDATE_LOGGER.ERROR_LOG)
+        OPTIONS_MANAGER.unpack_package_path = None
+        return False
+    OPTIONS_MANAGER.unpack_package_path = unpack_package
     return arg
 
 
@@ -146,8 +173,10 @@ def create_entrance_args():
             signing_algorithm : signature algorithm (ECC and RSA (default))
             private_key : path of the private key file
     """
-    description = "Tool for creating update package."
-    parser = argparse.ArgumentParser(description=description)
+    parser = OPTIONS_MANAGER.parser
+    parser.description = "Tool for creating update package."
+    parser.add_argument("-unpack", "--unpack_package", type=unpack_check,
+                        default=None, help="Unpack updater package.")
     parser.add_argument("-s", "--source_package", type=type_check,
                         default=None, help="Source package file path.")
     parser.add_argument("target_package", type=type_check,
@@ -183,36 +212,34 @@ def create_entrance_args():
                         help="SD Card mode, "
                              "Create update package for SD Card.")
 
-    args = parser.parse_args()
-    source_package = args.source_package
-    OPTIONS_MANAGER.source_package = source_package
-    target_package = args.target_package
-    OPTIONS_MANAGER.target_package = target_package
-    update_package = args.update_package
-    OPTIONS_MANAGER.update_package = update_package
-    no_zip = args.no_zip
-    OPTIONS_MANAGER.no_zip = no_zip
-    partition_file = args.partition_file
-    OPTIONS_MANAGER.partition_file = partition_file
-    signing_algorithm = args.signing_algorithm
-    OPTIONS_MANAGER.signing_algorithm = signing_algorithm
-    hash_algorithm = args.hash_algorithm
-    OPTIONS_MANAGER.hash_algorithm = hash_algorithm
-    private_key = args.private_key
-    OPTIONS_MANAGER.private_key = private_key
 
-    not_l2 = args.not_l2
-    OPTIONS_MANAGER.not_l2 = not_l2
-    signing_length = int(args.signing_length)
-    OPTIONS_MANAGER.signing_length = signing_length
-    xml_path = args.xml_path
-    OPTIONS_MANAGER.xml_path = xml_path
-    sd_card = args.sd_card
-    OPTIONS_MANAGER.sd_card = sd_card
+def parse_args():
+    args = OPTIONS_MANAGER.parser.parse_args()
+    OPTIONS_MANAGER.source_package = args.source_package
+    OPTIONS_MANAGER.target_package = args.target_package
+    OPTIONS_MANAGER.update_package = args.update_package
+    OPTIONS_MANAGER.no_zip = args.no_zip
+    OPTIONS_MANAGER.partition_file = args.partition_file
+    OPTIONS_MANAGER.signing_algorithm = args.signing_algorithm
+    OPTIONS_MANAGER.hash_algorithm = args.hash_algorithm
+    OPTIONS_MANAGER.private_key = args.private_key
+    OPTIONS_MANAGER.not_l2 = args.not_l2
+    OPTIONS_MANAGER.signing_length = int(args.signing_length)
+    OPTIONS_MANAGER.xml_path = args.xml_path
+    OPTIONS_MANAGER.sd_card = args.sd_card
 
-    ret_args = [source_package, target_package, update_package,
-                no_zip, not_l2, partition_file, signing_algorithm,
-                hash_algorithm, private_key]
+
+def get_args():
+    ret_args = \
+        [OPTIONS_MANAGER.source_package,
+        OPTIONS_MANAGER.target_package,
+        OPTIONS_MANAGER.update_package,
+        OPTIONS_MANAGER.no_zip,
+        OPTIONS_MANAGER.not_l2,
+        OPTIONS_MANAGER.partition_file,
+        OPTIONS_MANAGER.signing_algorithm,
+        OPTIONS_MANAGER.hash_algorithm,
+        OPTIONS_MANAGER.private_key]
     return ret_args
 
 
@@ -227,6 +254,11 @@ def get_script_obj():
         verse_script = VerseScript()
         refrain_script = RefrainScript()
         ending_script = EndingScript()
+
+        generate_verse_script = \
+            OPTIONS_MANAGER.init.invoke_event(VERSE_SCRIPT_EVENT)
+        if generate_verse_script:
+            verse_script = generate_verse_script()
     else:
         UPDATE_LOGGER.print_log(
             "Get vendor extension object completed!"
@@ -236,6 +268,30 @@ def get_script_obj():
         refrain_script = script_obj_list[2]
         ending_script = script_obj_list[3]
     return prelude_script, verse_script, refrain_script, ending_script
+
+
+def get_source_package_path(source_package):
+    """
+    get_source_package_path.
+    :param source_package: source package path
+    :return:
+    """
+    if os.path.isdir(source_package):
+        OPTIONS_MANAGER.source_package_dir = source_package
+    elif source_package.endswith('.zip'):
+        # Decompress the source package.
+        tmp_dir_obj, unzip_dir = unzip_package(source_package)
+        if tmp_dir_obj is False or unzip_dir is False:
+            clear_resource(err_clear=True)
+            return False
+        OPTIONS_MANAGER.source_package_dir = unzip_dir
+        OPTIONS_MANAGER.source_package_temp_obj = tmp_dir_obj
+    else:
+        UPDATE_LOGGER.print_log("Input Update Package type exception!"
+            "path: %s" % source_package, UPDATE_LOGGER.ERROR_LOG)
+        clear_resource(err_clear=True)
+        return False
+    return True
 
 
 def check_incremental_args(no_zip, partition_file, source_package,
@@ -276,9 +332,8 @@ def check_incremental_args(no_zip, partition_file, source_package,
         clear_resource(err_clear=True)
         return False
 
-    OPTIONS_MANAGER.source_package_temp_obj, \
-        OPTIONS_MANAGER.source_package_dir = \
-        unzip_package(source_package, origin='source')
+    if not get_source_package_path(source_package):
+        return False
     xml_path = ''
     if OPTIONS_MANAGER.source_package_dir is not False:
         xml_path = os.path.join(OPTIONS_MANAGER.source_package_dir,
@@ -295,6 +350,7 @@ def check_incremental_args(no_zip, partition_file, source_package,
         return False
     xml_content_dict = xmltodict.parse(xml_str, encoding='utf-8')
     package_dict = xml_content_dict.get('package', {})
+    get_update_config_softversion(OPTIONS_MANAGER.source_package_dir, package_dict.get('head', {}))
     head_dict = package_dict.get('head', {}).get('info')
     OPTIONS_MANAGER.source_package_version = head_dict.get("@softVersion")
     if check_package_version(OPTIONS_MANAGER.target_package_version,
@@ -400,8 +456,8 @@ def check_package_version(target_ver, source_ver):
     return:
     """
     try:
-        target_num = ''.join(target_ver.split(' ')[-1].split('.')[1:3])
-        source_num = ''.join(source_ver.split(' ')[-1].split('.')[1:3])
+        target_num = ''.join(target_ver.split(' ')[-1].replace('.', ''))
+        source_num = ''.join(source_ver.split(' ')[-1].replace('.', ''))
         if int(target_num) <= int(source_num):
             UPDATE_LOGGER.print_log(
                 'Target package version %s <= Source package version!'
@@ -414,6 +470,119 @@ def check_package_version(target_ver, source_ver):
                                 UPDATE_LOGGER.ERROR_LOG)
         return False
     return True
+
+
+def generate_image_map_file(image_path, map_path, image_name):
+    """
+    :param image_path: image path
+    :param map_path: image map file path
+    :param image_name: image name
+    :return:
+    """
+    if not os.path.exists(image_path):
+        UPDATE_LOGGER.print_log("The source %s.img file is missing from the"
+            "source package, cannot be incrementally processed. ",
+            image_name, UPDATE_LOGGER.ERROR_LOG)
+        return False
+
+    cmd = \
+        [E2FSDROID_PATH, "-B", map_path, "-a", "/%s" % image_name, image_path, "-e"]
+
+    sub_p = subprocess.Popen(
+            cmd, shell=False, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT)
+    sub_p.wait()
+
+    if not os.path.exists(map_path):
+        UPDATE_LOGGER.print_log("%s generate image map file failed."
+                                % image_path)
+        return False
+    return True
+
+
+def get_file_sha256(update_package):
+    sha256obj = hashlib.sha256()
+    maxbuf = 8192
+    package_file = open(update_package, 'rb')
+    while True:
+        buf = package_file.read(maxbuf)
+        if not buf:
+            break
+        sha256obj.update(buf)
+    package_file.close()
+    hash_value = sha256obj.hexdigest()
+    return str(hash_value).upper()
+
+
+def write_image_patch_script(partition, src_image_path, tgt_image_path,
+                             script_check_cmd_list, script_write_cmd_list, verse_script):
+    """
+    Add command content to the script.
+    :param partition: image name
+    :param script_check_cmd_list: incremental check command list
+    :param script_write_cmd_list: incremental write command list
+    :param verse_script: verse script object
+    :return:
+    """
+    src_sha = get_file_sha256(src_image_path)
+    src_size = os.path.getsize(src_image_path)
+    tgt_sha = get_file_sha256(tgt_image_path)
+    tgt_size = os.path.getsize(tgt_image_path)
+
+    sha_check_cmd = verse_script.image_sha_check(partition,
+        src_size, src_sha, tgt_size, tgt_sha)
+
+    first_block_check_cmd = verse_script.first_block_check(partition)
+
+    abort_cmd = verse_script.abort(partition)
+
+    cmd = 'if ({sha_check_cmd} != 0)' \
+            '{{\n    {abort_cmd}}}\n'.format(
+            sha_check_cmd=sha_check_cmd,
+            abort_cmd=abort_cmd)
+
+    script_check_cmd_list.append(cmd)
+
+    image_patch_cmd = verse_script.image_patch(partition, os.path.getsize(src_image_path),
+        get_file_sha256(src_image_path), os.path.getsize(tgt_image_path),
+        get_file_sha256(tgt_image_path))
+
+    cmd = '%s_WRITE_FLAG%s' % (partition, image_patch_cmd)
+    script_write_cmd_list.append(cmd)
+    return True
+
+
+def increment_image_diff_processing(
+        partition, src_image_path, tgt_image_path,
+        script_check_cmd_list, script_write_cmd_list, verse_script):
+    """
+    Incremental image processing
+    :param verse_script: verse script
+    :param incremental_img_list: incremental image list
+    :param source_package_dir: source package path
+    :param target_package_dir: target package path
+    :return:
+    """
+    patch_file_obj = tempfile.NamedTemporaryFile(
+            prefix="%s_patch.dat-" % partition, mode='wb')
+    OPTIONS_MANAGER.incremental_image_file_obj_list.append(
+            patch_file_obj)
+    cmd = [DIFF_EXE_PATH]
+
+    cmd.extend(['-s', src_image_path, '-d', tgt_image_path,
+                '-p', patch_file_obj.name, '-l', '4096'])
+    sub_p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT)
+    try:
+        output, _ = sub_p.communicate(timeout=5)
+    except subprocess.TimeoutExpired:
+        sub_p.kill()
+
+    sub_p.wait()
+    if sub_p.returncode != 0:
+        raise ValueError(output)
+    return write_image_patch_script(partition, src_image_path, tgt_image_path,
+        script_check_cmd_list, script_write_cmd_list, verse_script)
 
 
 def increment_image_processing(
@@ -430,7 +599,9 @@ def increment_image_processing(
     script_check_cmd_list = []
     script_write_cmd_list = []
     patch_process = None
-    for each_img in incremental_img_list:
+    block_diff = 0
+    for each_img_name in OPTIONS_MANAGER.incremental_img_name_list:
+        each_img = each_img_name[:-4]
         each_src_image_path = \
             os.path.join(source_package_dir,
                          '%s.img' % each_img)
@@ -443,66 +614,51 @@ def increment_image_processing(
         each_tgt_map_path = \
             os.path.join(target_package_dir,
                          '%s.map' % each_img)
-        if not os.path.exists(each_src_image_path):
-            UPDATE_LOGGER.print_log(
-                "The source %s.img file is missing from the source package, "
-                "the component: %s cannot be incrementally processed. "
-                "path: %s!" %
-                (each_img, each_img,
-                 os.path.join(source_package_dir, UPDATER_CONFIG,
-                              XML_FILE_PATH)),
-                UPDATE_LOGGER.ERROR_LOG)
-            clear_resource(err_clear=True)
-            return False
 
-        src_is_sparse = is_sparse_image(each_src_image_path)
-        tgt_is_sparse = is_sparse_image(each_tgt_image_path)
         check_make_map_path(each_img)
-        cmd = ["e2fsdroid", "-B", each_src_map_path,
-               "-a", "/%s" % each_img, each_src_image_path]
-        if not src_is_sparse:
-            cmd.append("-e")
-        sub_p = subprocess.Popen(
-            cmd, shell=False, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT)
-        sub_p.wait()
-
-        if not os.path.exists(each_tgt_image_path):
-            UPDATE_LOGGER.print_log(
-                "The target %s.img file is missing from the target package, "
-                "the component: %s cannot be incrementally processed. "
-                "Please check xml config, path: %s!" %
-                (each_img, each_img,
-                 os.path.join(target_package_dir, UPDATER_CONFIG,
-                              XML_FILE_PATH)),
-                UPDATE_LOGGER.ERROR_LOG)
-            clear_resource(err_clear=True)
-            return False
-
-        cmd = ["e2fsdroid", "-B", each_tgt_map_path,
-               "-a", "/%s" % each_img, each_tgt_image_path]
-        if not tgt_is_sparse:
-            cmd.append("-e")
-        sub_p = subprocess.Popen(
-            cmd, shell=False, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT)
-        sub_p.wait()
 
         if filecmp.cmp(each_src_image_path, each_tgt_image_path):
             UPDATE_LOGGER.print_log(
                 "Source Image is the same as Target Image!"
                 "src image path: %s, tgt image path: %s" %
                 (each_src_image_path, each_tgt_image_path),
-                UPDATE_LOGGER.ERROR_LOG)
+                UPDATE_LOGGER.INFO_LOG)
+
+        src_generate_map = True
+        tgt_generate_map = True
+        if not os.path.exists(each_src_map_path):
+            src_generate_map = generate_image_map_file(each_src_image_path,
+                                    each_src_map_path, each_img)
+            if not src_generate_map:
+                UPDATE_LOGGER.print_log("The source %s.img file"
+                        "generate map file failed. " % each_img)
+
+        if not os.path.exists(each_tgt_map_path):
+            tgt_generate_map = generate_image_map_file(each_tgt_image_path,
+                                    each_tgt_map_path, each_img)
+            if not tgt_generate_map:
+                UPDATE_LOGGER.print_log("The target %s.img file"
+                        "generate map file failed. " % each_img)
+
+        if not src_generate_map or not tgt_generate_map:
+            if increment_image_diff_processing(each_img, each_src_image_path, each_tgt_image_path,
+                script_check_cmd_list, script_write_cmd_list, verse_script) is True:
+                continue
+            UPDATE_LOGGER.print_log("increment_image_diff_processing %s failed" % each_img)
             clear_resource(err_clear=True)
             return False
-        if not src_is_sparse and not tgt_is_sparse:
-            src_image_class = \
-                IncUpdateImage(each_src_image_path, each_src_map_path)
-            tgt_image_class = \
-                IncUpdateImage(each_tgt_image_path, each_tgt_map_path)
-        else:
-            raise RuntimeError
+
+        block_diff += 1
+        src_image_class = \
+            IncUpdateImage(each_src_image_path, each_src_map_path)
+        tgt_image_class = \
+            IncUpdateImage(each_tgt_image_path, each_tgt_map_path)
+        OPTIONS_MANAGER.src_image = src_image_class
+        OPTIONS_MANAGER.tgt_image = tgt_image_class
+
+        inc_image = OPTIONS_MANAGER.init.invoke_event(INC_IMAGE_EVENT)
+        if inc_image:
+            src_image_class, tgt_image_class = inc_image()
 
         transfers_manager = TransfersManager(
             each_img, tgt_image_class, src_image_class)
@@ -519,11 +675,12 @@ def increment_image_processing(
         patch_process.package_patch_zip.package_patch_zip()
         patch_process.write_script(each_img, script_check_cmd_list,
                                    script_write_cmd_list, verse_script)
-    if not check_patch_file(patch_process):
-        UPDATE_LOGGER.print_log(
-            'Verify the incremental result failed!',
-            UPDATE_LOGGER.ERROR_LOG)
-        raise RuntimeError
+    if block_diff > 0:
+        if not check_patch_file(patch_process):
+            UPDATE_LOGGER.print_log(
+                'Verify the incremental result failed!',
+                UPDATE_LOGGER.ERROR_LOG)
+            raise RuntimeError
     UPDATE_LOGGER.print_log(
             'Verify the incremental result successfully!',
             UPDATE_LOGGER.INFO_LOG)
@@ -571,7 +728,7 @@ def check_make_map_path(each_img):
     in the environment variable, and False will be returned.
     """
     try:
-        cmd = ["e2fsdroid", " -h"]
+        cmd = [E2FSDROID_PATH, " -h"]
         subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT)
     except FileNotFoundError:
@@ -636,17 +793,35 @@ def check_args(private_key, source_package, target_package, update_package):
     return True
 
 
+create_entrance_args()
+
+
 def main():
     """
     Entry function.
     """
+    parse_args()
+
     OPTIONS_MANAGER.product = PRODUCT
 
     source_package, target_package, update_package, no_zip, not_l2, \
         partition_file, signing_algorithm, hash_algorithm, private_key = \
-        create_entrance_args()
+        get_args()
     if not_l2:
         no_zip = True
+    
+    # Unpack updater package
+    if OPTIONS_MANAGER.unpack_package_path:
+        package = UnpackPackage()
+        if not package.unpack_package():
+            UPDATE_LOGGER.print_log(
+                "Unpack update package .bin failed!", UPDATE_LOGGER.ERROR_LOG)
+            clear_resource(err_clear=True)
+            return
+        UPDATE_LOGGER.print_log("Unpack update package .bin success!")
+        clear_resource(err_clear=True)
+        return
+
     if OPTIONS_MANAGER.sd_card:
         if source_package is not None or \
                 OPTIONS_MANAGER.xml_path is not None or \
@@ -711,12 +886,14 @@ def main():
     # Full processing
     if len(OPTIONS_MANAGER.full_img_list) != 0:
         verse_script.add_command("\n# ---- full image ----\n")
-        full_image_content_len_list, full_image_file_obj_list = \
+        full_update_image = \
             FullUpdateImage(OPTIONS_MANAGER.target_package_dir,
-                            OPTIONS_MANAGER.full_img_list, verse_script,
-                            OPTIONS_MANAGER.full_image_path_list,
-                            no_zip=OPTIONS_MANAGER.no_zip).\
-            update_full_image()
+                            OPTIONS_MANAGER.full_img_list,
+                            OPTIONS_MANAGER.full_img_name_list,
+                            verse_script, OPTIONS_MANAGER.full_image_path_list,
+                            no_zip=OPTIONS_MANAGER.no_zip)
+        full_image_content_len_list, full_image_file_obj_list = \
+            full_update_image.update_full_image()
         if full_image_content_len_list is False or \
                 full_image_file_obj_list is False:
             clear_resource(err_clear=True)
