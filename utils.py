@@ -21,15 +21,14 @@ import json
 import os
 import shutil
 import tempfile
-import xmltodict
 import zipfile
-
 from collections import OrderedDict
-from build_pkcs7 import sign_ota_package
 from copy import copy
 from ctypes import cdll
 from cryptography.hazmat.primitives import hashes
 from log_exception import UPDATE_LOGGER
+import xmltodict
+from build_pkcs7 import sign_ota_package
 
 operation_path = os.path.dirname(os.path.realpath(__file__))
 PRODUCT = 'hi3516'
