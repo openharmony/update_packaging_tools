@@ -202,10 +202,11 @@ class OptionsManager:
         self.update_package_file_path = None
         self.signed_package = None
 
+
 OPTIONS_MANAGER = OptionsManager()
 
 
-unzip_package(package_path, origin='target'):
+def unzip_package(package_path, origin='target'):
     """
     Decompress the zip package.
     :param package_path: zip package path
@@ -252,7 +253,7 @@ unzip_package(package_path, origin='target'):
     return tmp_dir_obj, unzip_dir
 
 
-split_img_name(image_path):
+def split_img_name(image_path):
     """
     Split the image name by image path
     :return image name
@@ -263,7 +264,7 @@ split_img_name(image_path):
     return str_list[-1]
 
 
-get_update_config_softversion(mbn_dir, head_info_dict):
+def get_update_config_softversion(mbn_dir, head_info_dict):
     soft_version_file = head_info_dict.get('softVersionFile')
     if soft_version_file is not None:
         mbn_path = os.path.join(mbn_dir, soft_version_file)
@@ -272,7 +273,7 @@ get_update_config_softversion(mbn_dir, head_info_dict):
                 head_info_dict['info']["@softVersion"] = mbn_file.read()
 
 
-parse_update_config(xml_path):
+def parse_update_config(xml_path):
     """
     Parse the XML configuration file.
     :param xml_path: XML configuration file path
@@ -345,7 +346,7 @@ parse_update_config(xml_path):
     return ret_params
 
 
-partitions_conversion(data):
+def partitions_conversion(data):
     """
     Convert the start or length data in the partition table through
     multiply 1024 * 1024 and return the data.
@@ -360,7 +361,7 @@ partitions_conversion(data):
         return False
 
 
-parse_partition_file_xml(xml_path):
+def parse_partition_file_xml(xml_path):
     """
     Parse the XML configuration file.
     :param xml_path: XML configuration file path
@@ -407,7 +408,7 @@ parse_partition_file_xml(xml_path):
     return file_obj, partitions_list, partitions_file_path_list
 
 
-expand_component(component_dict):
+def expand_component(component_dict):
     """
     Append components such as VERSION.mbn and board list.
     :param component_dict: component information dict
@@ -424,7 +425,7 @@ expand_component(component_dict):
         component_dict[each] = tmp_info_list
 
 
-clear_options():
+def clear_options():
     """
     Clear OPTIONS_MANAGER.
     """
@@ -493,7 +494,7 @@ clear_options():
     OPTIONS_MANAGER.update_package_file_path = None
 
 
-clear_resource(err_clear=False):
+def clear_resource(err_clear=False):
     """
     Clear resources, close temporary files, and clear temporary paths.
     :param err_clear: whether to clear errors
@@ -533,7 +534,7 @@ clear_resource(err_clear=False):
     clear_options()
 
 
-clear_file_obj(err_clear):
+def clear_file_obj(err_clear):
     """
     Clear resources and temporary file objects.
     :param err_clear: whether to clear errors
@@ -569,7 +570,7 @@ clear_file_obj(err_clear):
         UPDATE_LOGGER.print_log('Resource cleaning completed!')
 
 
-get_file_content(file_path, file_name=None):
+def get_file_content(file_path, file_name=None):
     """
     Read the file content.
     :param file_path: file path
@@ -588,7 +589,7 @@ get_file_content(file_path, file_name=None):
     return file_content
 
 
-get_update_info():
+def get_update_info():
     """
     Parse the configuration file to obtain the update information.
     :return: update information if any; false otherwise.
@@ -647,7 +648,7 @@ get_update_info():
     return True
 
 
-sign_package():
+def sign_package():
     return sign_ota_package(
         OPTIONS_MANAGER.update_package_file_path,
         OPTIONS_MANAGER.signed_package,
