@@ -48,9 +48,7 @@ import filecmp
 import os
 import argparse
 import subprocess
-
 import xmltodict
-
 import patch_package_process
 
 from gigraph_process import GigraphProcess
@@ -64,6 +62,7 @@ from script_generator import VerseScript
 from script_generator import RefrainScript
 from script_generator import EndingScript
 from update_package import build_update_package
+from vendor_script import create_vendor_script_class
 from utils import OPTIONS_MANAGER
 from utils import UPDATER_CONFIG
 from utils import parse_partition_file_xml
@@ -74,7 +73,6 @@ from utils import XML_FILE_PATH
 from utils import get_update_info
 from utils import SCRIPT_KEY_LIST
 from utils import PER_BLOCK_SIZE
-from vendor_script import create_vendor_script_class
 
 
 def type_check(arg):

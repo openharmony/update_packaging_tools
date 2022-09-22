@@ -19,6 +19,10 @@ import zipfile
 
 from test.fake_data import PARTITION_FILE_CONVERSION_FAILED
 from test.fake_data import UPDATER_SPECIFIED_CONFIG_REPEATS
+from patch_package_process import PatchProcess
+from transfers_manager import ActionInfo
+from transfers_manager import ActionType
+from blocks_manager import BlocksManager
 from utils import unzip_package
 from utils import clear_resource
 from utils import OPTIONS_MANAGER
@@ -28,10 +32,6 @@ from utils import VERSION_MBN_PATH
 from utils import BOARD_LIST_PATH
 from utils import UPDATER_CONFIG
 from utils import parse_partition_file_xml
-from patch_package_process import PatchProcess
-from transfers_manager import ActionInfo
-from transfers_manager import ActionType
-from blocks_manager import BlocksManager
 
 
 class TestUtils(unittest.TestCase):
