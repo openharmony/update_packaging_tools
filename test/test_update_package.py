@@ -126,7 +126,7 @@ class TestUpdatePackage(unittest.TestCase):
             get_hash_content("non_existent.file", 'sha256')
 
         re_str = get_hash_content("non_existent.file", 'test_sha')
-        check_re = re_str is None
+        check_re = re_str is False
         self.assertEqual(check_re, True)
         clear_resource()
 

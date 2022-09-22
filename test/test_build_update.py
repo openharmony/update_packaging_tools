@@ -19,20 +19,20 @@ import unittest
 import sys
 import zipfile
 
+from test.create_package_data import clear_package
+from test.create_package_data import create_input_package
+from test.fake_data import RSA_PRIVATE_KEY_DATA
 from build_update import increment_image_processing
 from build_update import main
 from build_update import check_update_package
 from build_update import check_miss_private_key
 from build_update import check_target_package_path
-from test.create_package_data import clear_package
-from test.create_package_data import create_input_package
 from script_generator import VerseScript
 from build_update import check_incremental_args
-from test.fake_data import RSA_PRIVATE_KEY_DATA
-from utils import OPTIONS_MANAGER
 from utils import clear_resource
 from build_update import check_package_version
 from build_update import private_key_check
+from utils import OPTIONS_MANAGER
 
 
 class TestUpdateUtils(unittest.TestCase):

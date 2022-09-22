@@ -188,7 +188,7 @@ def get_component_list(all_image_file_obj_list, component_dict):
             file_path = \
                 all_image_file_obj_list[idx - len(extend_component_list)].name
         digest = get_hash_content(file_path, OPTIONS_MANAGER.hash_algorithm)
-        if digest is None:
+        if not digest:
             return
         if component is None:
             component = copy.copy(COMPONENT_INFO_INNIT)
@@ -522,7 +522,7 @@ def get_hash_content(file_path, hash_algorithm):
         UPDATE_LOGGER.print_log(
             "Unsupported hash algorithm! %s" % hash_algorithm,
             log_type=UPDATE_LOGGER.ERROR_LOG)
-        return None
+        return False
     if not os.path.exists(file_path):
         UPDATE_LOGGER.print_log(
             "%s failed!" % LINUX_HASH_ALGORITHM_DICT.get(hash_algorithm),

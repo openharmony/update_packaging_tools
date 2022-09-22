@@ -15,14 +15,14 @@
 
 import unittest
 
-from utils import SCRIPT_KEY_LIST
-from utils import clear_resource
 from vendor_script import create_vendor_script_class
 from vendor_script import VendorPreludeScript
 from vendor_script import VendorVerseScript
 from vendor_script import VendorRefrainScript
 from vendor_script import VendorEndingScript
 from vendor_script import ExtensionCmdRegister
+from utils import SCRIPT_KEY_LIST
+from utils import clear_resource
 
 
 class TestVendorScript(unittest.TestCase):
