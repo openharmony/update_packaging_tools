@@ -432,6 +432,8 @@ def build_update_package(no_zip, update_package, prelude_script,
         signed_package = os.path.join(
             update_package, "%s.zip" % update_file_name)
         OPTIONS_MANAGER.signed_package = signed_package
+        if os.path.exists(signed_package):
+            os.remove(signed_package)
 
         sign_ota_package = \
             OPTIONS_MANAGER.init.invoke_event(SIGN_PACKAGE_EVENT)
@@ -448,6 +450,8 @@ def build_update_package(no_zip, update_package, prelude_script,
     else:
         update_package_path = os.path.join(
             update_package, '%s.bin' % update_file_name)
+        if os.path.exists(update_package_path):
+            os.remove(update_package_path)
         OPTIONS_MANAGER.update_package_file_path = update_package_path
         with open(OPTIONS_MANAGER.update_bin_obj.name, 'rb') as r_f:
             content = r_f.read()
