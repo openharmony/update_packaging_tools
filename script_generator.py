@@ -161,7 +161,7 @@ class VerseScript(Script):
         :return:
         """
         cmd = 'show_progress({start_progress}, {dur});\n'.format(
-            start_progress=start_progress, dur=dur)
+            start_progress=float(start_progress), dur=float(dur))
         return cmd
 
     def image_patch(self, partition, src_size, src_hash, target_size, target_hash):
