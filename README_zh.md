@@ -2,7 +2,10 @@
 
 -   [简介](#section184mcpsimp)
 -   [目录](#section191mcpsimp)
+-   [约束](#section120mcpsimp)
 -   [说明](#section211mcpsimp)
+    -   [使用说明](#section220mcpsimp)
+
 -   [相关仓](#section247mcpsimp)
 
 ## 简介<a name="section184mcpsimp"></a>
@@ -15,6 +18,8 @@
 
 - 变分区升级包：升级包中包括分区表、镜像全量数据，用于变分区处理和变分区后的镜像恢复。
 
+更多升级子系统相关概念，请参考：[升级子系统](https://gitee.com/openharmony/docs/blob/master/zh-cn/readme/%E5%8D%87%E7%BA%A7%E5%AD%90%E7%B3%BB%E7%BB%9F.md)
+
 ## 目录<a name="section191mcpsimp"></a>
 
 ```
@@ -22,18 +27,21 @@
 ├── lib                         # 制作升级包工具依赖库目录
 ├── blocks_manager.py           # BlocksManager类定义，用于block块管理
 ├── build_update.py             # 差分包制作工具入口代码，入口参数定义
+├── build_pkcs7.py              # 升级包签名
+├── create_update_package.py    # 升级包制作
 ├── gigraph_process.py          # 生成Stash，重置ActionList的顺序
 ├── image_class.py              # 全量镜像、稀疏镜像解析处理
 ├── log_exception.py            # 全局log系统定义，自定义exception
 ├── patch_package_process.py    # 差分镜像处理，Block差分获取patch差异
 ├── script_generator.py         # 升级脚本生成器
 ├── transfers_manager.py        # 创建ActionInfo对象
+├── unpack_update_package.py    # 升级包反解
 ├── update_package.py           # 升级包格式管理、升级包写入
 ├── utils.py                    # Options管理,其他相关功能函数定义
 └── vendor_script.py            # 厂商升级流程脚本扩展
 ```
 
-## 说明<a name="section211mcpsimp"></a>
+## 约束<a name="section120mcpsimp"></a>
 
 工具运行环境配置：
 
@@ -42,6 +50,10 @@
 - python3.5及以上版本；
 
 - python库xmltodict， 解析xml文件，需要单独安装；
+
+## 说明<a name="section211mcpsimp"></a>
+
+### 使用说明<a name="section220mcpsimp"></a>
 
 - bsdiff可执行程序，差分计算，比较生成patch；
 
@@ -79,7 +91,7 @@ python build_update.py -s source.zip ./target/ ./target/package -pk./target/upda
 
 ## 相关仓<a name="section247mcpsimp"></a>
 
-升级子系统
+[升级子系统](https://gitee.com/openharmony/docs/blob/master/zh-cn/readme/%E5%8D%87%E7%BA%A7%E5%AD%90%E7%B3%BB%E7%BB%9F.md)
 
-**update\_packaging\_tools**
+[**update\_packaging\_tools**](https://gitee.com/openharmony/update_packaging_tools)
 
