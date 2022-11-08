@@ -572,11 +572,7 @@ def increment_image_diff_processing(
                 '-p', patch_file_obj.name, '-l', '4096'])
     sub_p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT)
-    try:
-        output, _ = sub_p.communicate(timeout=5)
-    except subprocess.TimeoutExpired:
-        sub_p.kill()
-
+    output, _ = sub_p.communicate()
     sub_p.wait()
     if sub_p.returncode != 0:
         raise ValueError(output)
