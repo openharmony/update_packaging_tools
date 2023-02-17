@@ -376,6 +376,8 @@ def create_build_tools_zip():
     if OPTIONS_MANAGER.register_script_file_obj is not None:
         zip_file.write(register_script_file_obj.name, REGISTER_SCRIPT_FILE_NAME)
         files_to_sign += [(register_script_file_obj.name, "build_tools/" + REGISTER_SCRIPT_FILE_NAME)]
+
+    # add hash signed data to build_tools.zip
     signed_data = generate_signed_data(files_to_sign, sign_func, OPTIONS_MANAGER.private_key)
     zip_file.writestr("hash_signed_data", signed_data)
     zip_file.close()
