@@ -19,17 +19,6 @@ def sign_func(sign_file, private_key_file):
     signature = sign_digest(hash_sha256.digest(), private_key_file)
     return str(b64encode(signature).decode("ascii"))
 
-#
-# hash signed data format:
-#
-# name: build_tools/updater_binary
-# signed-data: xxxxxxx
-#
-# name: build_tools/updater_binary
-# signed-data: xxxxxxx
-#
-# ....
-#
 def generate_signed_data(file_lists, sign_func, private_key_file):
     """
     get hash signed data of file lists, hash signed data format:
