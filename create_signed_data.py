@@ -56,7 +56,7 @@ def generate_signed_data(file_lists, sign_func, private_key_file):
         return ""
 
     if len(file_lists) > max_file_num:
-        UPDATE_LOGGER.print_log("signed file can't be more than %d" % MAX_SIGN_FILE_NUM,
+        UPDATE_LOGGER.print_log("signed file can't be more than %d" % max_file_num,
             log_type=UPDATE_LOGGER.ERROR_LOG)
         return ""
     return "\n".join(["name: {}\nsigned-data: {}\n".format(
