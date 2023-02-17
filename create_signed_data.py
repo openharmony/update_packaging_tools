@@ -50,12 +50,12 @@ def generate_signed_data(file_lists, sign_func, private_key_file):
     :param private_key_file: private key path, ex. rsa_private_key2048.pem
     :return: hash signed data of the file_lists
     """
-    MAX_SIGN_FILE_NUM = 32
+    max_file_num = 32
     if not sign_func:
         UPDATE_LOGGER.print_log("please provide a sign function", log_type=UPDATE_LOGGER.ERROR_LOG)
         return ""
 
-    if len(file_lists) > MAX_SIGN_FILE_NUM:
+    if len(file_lists) > max_file_num:
         UPDATE_LOGGER.print_log("signed file can't be more than %d" % MAX_SIGN_FILE_NUM,
             log_type=UPDATE_LOGGER.ERROR_LOG)
         return ""
