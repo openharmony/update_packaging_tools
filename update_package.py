@@ -43,7 +43,7 @@ from utils import SIGN_PACKAGE_EVENT
 from create_update_package import CreatePackage
 from create_update_package import SIGN_ALGO_RSA
 from create_update_package import SIGN_ALGO_PSS
-from create_signed_data import sign_func
+from create_signed_data import sign_func_sha256
 from create_signed_data import generate_signed_data
 
 IS_DEL = 0
@@ -378,7 +378,7 @@ def create_build_tools_zip():
         files_to_sign += [(register_script_file_obj.name, "build_tools/" + REGISTER_SCRIPT_FILE_NAME)]
 
     # add hash signed data to build_tools.zip
-    signed_data = generate_signed_data(files_to_sign, sign_func, OPTIONS_MANAGER.private_key)
+    signed_data = generate_signed_data(files_to_sign, sign_func_sha256, OPTIONS_MANAGER.private_key)
     zip_file.writestr("hash_signed_data", signed_data)
     zip_file.close()
     return file_obj

@@ -15,13 +15,12 @@
 # limitations under the License.
 
 import hashlib
+from base64 import b64encode
 from build_pkcs7 import BLCOK_SIZE, sign_digest
 from log_exception import UPDATE_LOGGER
-from base64 import b64encode
 
-MAX_SIGN_FILE_NUM = 32
 
-def sign_func(sign_file, private_key_file):
+def sign_func_sha256(sign_file, private_key_file):
     """
     sign one file with private key
     :param sign_file: path of file ready to be signed
@@ -35,6 +34,7 @@ def sign_func(sign_file, private_key_file):
     signature = sign_digest(hash_sha256.digest(), private_key_file)
     return str(b64encode(signature).decode("ascii"))
 
+
 def generate_signed_data(file_lists, sign_func, private_key_file):
     """
     get hash signed data of file lists, hash signed data format:
@@ -46,17 +46,18 @@ def generate_signed_data(file_lists, sign_func, private_key_file):
     
     ....
     :param file_lists: path list of file ready to be signed, list item contains file_path and name_in_signed_data
-    :param sign_func: signature function, ex. sign_func
+    :param sign_func: signature function, ex. sign_func_sha256
     :param private_key_file: private key path, ex. rsa_private_key2048.pem
     :return: hash signed data of the file_lists
     """
+    MAX_SIGN_FILE_NUM = 32
     if not sign_func:
         UPDATE_LOGGER.print_log("please provide a sign function", log_type=UPDATE_LOGGER.ERROR_LOG)
-        return None
+        return ""
 
     if len(file_lists) > MAX_SIGN_FILE_NUM:
         UPDATE_LOGGER.print_log("signed file can't be more than %d" % MAX_SIGN_FILE_NUM,
             log_type=UPDATE_LOGGER.ERROR_LOG)
-        return None
-    return "\n".join([ "name: {}\nsigned-data: {}\n".format(
-        name, sign_func(file, private_key_file)) for (file, name) in file_lists ])
+        return ""
+    return "\n".join(["name: {}\nsigned-data: {}\n".format(
+        name, sign_func(file, private_key_file)) for (file, name) in file_lists])
