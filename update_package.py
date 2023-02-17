@@ -43,6 +43,8 @@ from utils import SIGN_PACKAGE_EVENT
 from create_update_package import CreatePackage
 from create_update_package import SIGN_ALGO_RSA
 from create_update_package import SIGN_ALGO_PSS
+from create_signed_data import sign_func
+from create_signed_data import generate_signed_data
 
 IS_DEL = 0
 SIGNING_LENGTH_256 = 256
@@ -357,21 +359,26 @@ def create_build_tools_zip():
 
     file_obj = tempfile.NamedTemporaryFile(
         dir=OPTIONS_MANAGER.update_package, prefix="build_tools-")
+    files_to_sign = []
     zip_file = zipfile.ZipFile(file_obj.name, 'w', zipfile.ZIP_DEFLATED)
     # add opera_script to build_tools.zip
     for key, value in opera_script_dict.items():
         zip_file.write(key, value)
+        files_to_sign += [(key, "build_tools/" + value)]
 
     # add update_binary to build_tools.zip
     zip_file.write(update_exe_path, UPDATE_EXE_FILE_NAME)
+    files_to_sign += [(update_exe_path, "build_tools/" + UPDATE_EXE_FILE_NAME)]
 
     # add loadScript to build_tools.zip
     zip_file.write(total_script_file_obj.name, TOTAL_SCRIPT_FILE_NAME)
-
+    files_to_sign += [(total_script_file_obj.name, "build_tools/" + TOTAL_SCRIPT_FILE_NAME)]
     if OPTIONS_MANAGER.register_script_file_obj is not None:
         zip_file.write(register_script_file_obj.name, REGISTER_SCRIPT_FILE_NAME)
+        files_to_sign += [(register_script_file_obj.name, "build_tools/" + REGISTER_SCRIPT_FILE_NAME)]
+    signed_data = generate_signed_data(files_to_sign, sign_func, OPTIONS_MANAGER.private_key)
+    zip_file.writestr("hash_signed_data", signed_data)
     zip_file.close()
-
     return file_obj
 
 
