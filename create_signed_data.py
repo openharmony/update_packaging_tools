@@ -59,5 +59,5 @@ def generate_signed_data(file_lists, sign_func, private_key_file):
         UPDATE_LOGGER.print_log("signed file can't be more than %d" % max_file_num,
             log_type=UPDATE_LOGGER.ERROR_LOG)
         return ""
-    return "\n".join(["name: {}\nsigned-data: {}\n".format(
+    return "\n".join(["Name: {}\nsigned-data: {}\n".format(
         name, sign_func(file, private_key_file)) for (file, name) in file_lists])

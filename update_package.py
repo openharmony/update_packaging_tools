@@ -361,21 +361,23 @@ def create_build_tools_zip():
         dir=OPTIONS_MANAGER.update_package, prefix="build_tools-")
     files_to_sign = []
     zip_file = zipfile.ZipFile(file_obj.name, 'w', zipfile.ZIP_DEFLATED)
+    # file name will be prefixed by build_tools in hash signed data
+    name_format_str = "build_tools/{}"
     # add opera_script to build_tools.zip
     for key, value in opera_script_dict.items():
         zip_file.write(key, value)
-        files_to_sign += [(key, "build_tools/{}".format(value))]
+        files_to_sign += [(key, name_format_str.format(value))]
 
     # add update_binary to build_tools.zip
     zip_file.write(update_exe_path, UPDATE_EXE_FILE_NAME)
-    files_to_sign += [(update_exe_path, "build_tools/{}".format(UPDATE_EXE_FILE_NAME))]
+    files_to_sign += [(update_exe_path, name_format_str.format(UPDATE_EXE_FILE_NAME))]
 
     # add loadScript to build_tools.zip
     zip_file.write(total_script_file_obj.name, TOTAL_SCRIPT_FILE_NAME)
-    files_to_sign += [(total_script_file_obj.name, "build_tools/{}".format(TOTAL_SCRIPT_FILE_NAME))]
+    files_to_sign += [(total_script_file_obj.name, name_format_str.format(TOTAL_SCRIPT_FILE_NAME))]
     if OPTIONS_MANAGER.register_script_file_obj is not None:
         zip_file.write(register_script_file_obj.name, REGISTER_SCRIPT_FILE_NAME)
-        files_to_sign += [(register_script_file_obj.name, "build_tools/{}".format(REGISTER_SCRIPT_FILE_NAME))]
+        files_to_sign += [(register_script_file_obj.name, name_format_str.format(REGISTER_SCRIPT_FILE_NAME))]
 
     # add hash signed data to build_tools.zip
     signed_data = generate_signed_data(files_to_sign, sign_func_sha256, OPTIONS_MANAGER.private_key)
