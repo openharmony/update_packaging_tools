@@ -43,10 +43,10 @@ def generate_signed_data(file_lists, sign_func, private_key_file):
     get hash signed data of file lists, hash signed data format:
     name: build_tools/updater_binary
     signed-data: xxxxxxx
-    
+
     name: build_tools/updater_binary
     signed-data: xxxxxxx
-    
+
     ....
     :param file_lists: path list of file ready to be signed, list item contains file_path and name_in_signed_data
     :param sign_func: signature function, ex. sign_func_sha256
