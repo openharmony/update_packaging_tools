@@ -41,10 +41,10 @@ def sign_func_sha256(sign_file, private_key_file):
 def generate_signed_data(file_lists, sign_func, private_key_file):
     """
     get hash signed data of file lists, hash signed data format:
-    name: build_tools/updater_binary
+    Name: build_tools/updater_binary
     signed-data: xxxxxxx
 
-    name: build_tools/updater_binary
+    Name: build_tools/updater_binary
     signed-data: xxxxxxx
 
     ....
