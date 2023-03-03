@@ -32,6 +32,9 @@ def sign_func_sha256(sign_file, private_key_file):
         while chunk := file.read(BLCOK_SIZE):
             hash_sha256.update(chunk)
     signature = sign_digest(hash_sha256.digest(), private_key_file)
+    if signature == False:
+        UPDATE_LOGGER.print_log("sign digest failed", log_type=UPDATE_LOGGER.ERROR_LOG)
+        return ""
     return str(b64encode(signature).decode("ascii"))
 
 
@@ -59,5 +62,11 @@ def generate_signed_data(file_lists, sign_func, private_key_file):
         UPDATE_LOGGER.print_log("signed file can't be more than %d" % max_file_num,
             log_type=UPDATE_LOGGER.ERROR_LOG)
         return ""
-    return "\n".join(["Name: {}\nsigned-data: {}\n".format(
-        name, sign_func(file, private_key_file)) for (file, name) in file_lists])
+    sign_res_list = []
+    for file, name in file_lists:
+        sign_res = sign_func(file, private_key_file)
+        if sign_res == "":
+            UPDATE_LOGGER.print_log("sign file {} failed".format(name), log_type=UPDATE_LOGGER.ERROR_LOG)
+            return ""
+        sign_res_list += ["Name: {}\nsigned-data: {}\n".format(name, sign_res)]
+    return "\n".join(sign_res_list)

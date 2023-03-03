@@ -381,6 +381,10 @@ def create_build_tools_zip():
 
     # add hash signed data to build_tools.zip
     signed_data = generate_signed_data(files_to_sign, sign_func_sha256, OPTIONS_MANAGER.private_key)
+    if signed_data == "":
+        UPDATE_LOGGER.print_log("generate_signed_data failed", log_type=UPDATE_LOGGER.ERROR_LOG)
+        zip_file.close()
+        return False
     zip_file.writestr("hash_signed_data", signed_data)
     zip_file.close()
     return file_obj
