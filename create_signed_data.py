@@ -18,6 +18,7 @@ import hashlib
 from base64 import b64encode
 from build_pkcs7 import BLCOK_SIZE, sign_digest
 from log_exception import UPDATE_LOGGER
+from utils import OPTIONS_MANAGER
 
 
 def sign_func_sha256(sign_file, private_key_file):
@@ -70,3 +71,7 @@ def generate_signed_data(file_lists, sign_func, private_key_file):
             return ""
         sign_res_list += ["Name: {}\nsigned-data: {}\n".format(name, sign_res)]
     return "\n".join(sign_res_list)
+
+
+def generate_signed_data_default(file_lists):
+    return generate_signed_data(file_lists, sign_func_sha256, OPTIONS_MANAGER.private_key)

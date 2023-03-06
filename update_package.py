@@ -40,11 +40,11 @@ from utils import EXTEND_COMPONENT_LIST
 from utils import LINUX_HASH_ALGORITHM_DICT
 from utils import BUILD_TOOLS_FILE_NAME
 from utils import SIGN_PACKAGE_EVENT
+from utils import GENERATE_SIGNED_DATA_EVENT
 from create_update_package import CreatePackage
 from create_update_package import SIGN_ALGO_RSA
 from create_update_package import SIGN_ALGO_PSS
-from create_signed_data import sign_func_sha256
-from create_signed_data import generate_signed_data
+from create_signed_data import generate_signed_data_default
 
 IS_DEL = 0
 SIGNING_LENGTH_256 = 256
@@ -379,8 +379,13 @@ def create_build_tools_zip():
         zip_file.write(register_script_file_obj.name, REGISTER_SCRIPT_FILE_NAME)
         files_to_sign += [(register_script_file_obj.name, name_format_str.format(REGISTER_SCRIPT_FILE_NAME))]
 
+    generate_signed_data_ext = OPTIONS_MANAGER.init.invoke_event(GENERATE_SIGNED_DATA_EVENT)
+    signed_data = ""
     # add hash signed data to build_tools.zip
-    signed_data = generate_signed_data(files_to_sign, sign_func_sha256, OPTIONS_MANAGER.private_key)
+    if generate_signed_data_ext is False:
+        signed_data = generate_signed_data_default(files_to_sign)
+    else:
+        signed_data = generate_signed_data_ext(files_to_sign)
     if signed_data == "":
         UPDATE_LOGGER.print_log("generate_signed_data failed", log_type=UPDATE_LOGGER.ERROR_LOG)
         zip_file.close()
