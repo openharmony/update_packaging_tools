@@ -76,6 +76,7 @@ TWO_STEP = "updater"
 VERSE_SCRIPT_EVENT = 0
 INC_IMAGE_EVENT = 1
 SIGN_PACKAGE_EVENT = 2
+GENERATE_SIGNED_DATA_EVENT = 6 # sign build tools files to get hash_signed_data
 
 # Image file can not support update.
 FORBIDEN_UPDATE_IMAGE_LIST = ["updater_boot", "updater_b", "ptable"]
