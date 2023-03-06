@@ -379,6 +379,15 @@ def create_build_tools_zip():
         zip_file.write(register_script_file_obj.name, REGISTER_SCRIPT_FILE_NAME)
         files_to_sign += [(register_script_file_obj.name, name_format_str.format(REGISTER_SCRIPT_FILE_NAME))]
 
+    if create_hsd_for_build_tools(zip_file, files_to_sign) is False:
+        return False
+    return file_obj
+
+
+def create_hsd_for_build_tools(zip_file, files_to_sign):
+    """
+    generate hash signed data for build_tools.zip
+    """
     generate_signed_data_ext = OPTIONS_MANAGER.init.invoke_event(GENERATE_SIGNED_DATA_EVENT)
     signed_data = ""
     # add hash signed data to build_tools.zip
@@ -392,7 +401,7 @@ def create_build_tools_zip():
         return False
     zip_file.writestr("hash_signed_data", signed_data)
     zip_file.close()
-    return file_obj
+    return True
 
 
 def build_update_package(no_zip, update_package, prelude_script,
