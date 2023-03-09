@@ -133,7 +133,7 @@ def write_signed_package(unsigned_package, signature, signed_package):
     signature_size = len(signature)
     signature_total_size = signature_size + FOOTER_LENGTH
 
-    package_fd = os.open(signed_package, os.O_RDWR | os.O_CREAT, 0o755)
+    package_fd = os.open(signed_package, os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o755)
     f_signed = os.fdopen(package_fd, 'wb')
 
     remain_len = os.path.getsize(unsigned_package) - 2
@@ -160,12 +160,12 @@ def sign_ota_package(package_path, signed_package, private_key):
     data = create_encap_content_info(digest)
     signature = sign_digest(digest, private_key)
 
-    digest_fd = os.open("digest", os.O_RDWR | os.O_CREAT, 0o755)
+    digest_fd = os.open("digest", os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o755)
     digest_file = os.fdopen(digest_fd, 'wb')
     digest_file.write(digest)
     digest_file.close()
 
-    signatute_fd = os.open("signature", os.O_RDWR | os.O_CREAT, 0o755)
+    signatute_fd = os.open("signature", os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o755)
     signatute_file = os.fdopen(signatute_fd, 'wb')
     signatute_file.write(signature)
     signatute_file.close()
