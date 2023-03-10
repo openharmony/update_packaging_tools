@@ -31,7 +31,7 @@ from cryptography.hazmat.primitives import hashes
 
 operation_path = os.path.dirname(os.path.realpath(__file__))
 CERT_PATH = os.path.join(operation_path, 'sign_cert/signing_cert.crt')
-BLCOK_SIZE = 8192
+BLOCK_SIZE = 8192
 FOOTER_LENGTH = 6
 ZIP_ECOD_LENGTH = 22
 DIGEST_SHA256 = 672
@@ -41,7 +41,7 @@ CONTENT_INFO_FORMAT = "<2H32s"
 # the length of zip eocd comment
 ZIP_EOCD_COMMENT_LEN_FORMAT = "<H"
 # signed package footer
-SIGANTURE_FOOTER_FORMAT = "<3H"
+SIGNATURE_FOOTER_FORMAT = "<3H"
 
 
 def load_public_cert():
@@ -62,16 +62,16 @@ def calculate_package_hash(package_path):
 
     remain_len = os.path.getsize(package_path) - ZIP_ECOD_LENGTH
     with open(package_path, 'rb') as package_file:
-        while remain_len > BLCOK_SIZE:
-            hash_sha256.update(package_file.read(BLCOK_SIZE))
-            remain_len -= BLCOK_SIZE
+        while remain_len > BLOCK_SIZE:
+            hash_sha256.update(package_file.read(BLOCK_SIZE))
+            remain_len -= BLOCK_SIZE
         if remain_len > 0:
             hash_sha256.update(package_file.read(remain_len))
 
     return hash_sha256.digest()
 
 
-def sign_digest_with_pss(digset, private_key_file):
+def sign_digest_with_pss(digest, private_key_file):
     # read private key from pem file
     try:
         with open(private_key_file, 'rb') as f_r:
@@ -86,7 +86,7 @@ def sign_digest_with_pss(digset, private_key_file):
             salt_length=padding.PSS.MAX_LENGTH)
 
         signature = private_key.sign(
-            digset,
+            digest,
             pad,
             hashes.SHA256()
         )
@@ -95,7 +95,7 @@ def sign_digest_with_pss(digset, private_key_file):
     return signature
 
 
-def sign_digest(digset, private_key_file):
+def sign_digest(digest, private_key_file):
     # read private key from pem file
     try:
         with open(private_key_file, 'rb') as f_r:
@@ -107,7 +107,7 @@ def sign_digest(digset, private_key_file):
             backend=default_backend())
 
         signature = private_key.sign(
-            digset,
+            digest,
             padding.PKCS1v15(),
             hashes.SHA256()
         )
@@ -116,13 +116,13 @@ def sign_digest(digset, private_key_file):
     return signature
 
 
-def create_encap_content_info(diget):
-    if not diget:
+def create_encap_content_info(digest):
+    if not digest:
         UPDATE_LOGGER.print_log("calc package hash failed! file: %s",
             log_type=UPDATE_LOGGER.ERROR_LOG)
         return False
     content_header = struct.pack(CONTENT_INFO_FORMAT, DIGEST_SHA256,
-        SHA256_HASH_LEN, diget)
+        SHA256_HASH_LEN, digest)
     return content_header
 
 
@@ -138,9 +138,9 @@ def write_signed_package(unsigned_package, signature, signed_package):
 
     remain_len = os.path.getsize(unsigned_package) - 2
     with open(unsigned_package, 'rb') as f_unsign:
-        while remain_len > BLCOK_SIZE:
-            f_signed.write(f_unsign.read(BLCOK_SIZE))
-            remain_len -= BLCOK_SIZE
+        while remain_len > BLOCK_SIZE:
+            f_signed.write(f_unsign.read(BLOCK_SIZE))
+            remain_len -= BLOCK_SIZE
         if remain_len > 0:
             f_signed.write(f_unsign.read(remain_len))
     
@@ -149,9 +149,9 @@ def write_signed_package(unsigned_package, signature, signed_package):
     f_signed.write(zip_comment_len)
 
     f_signed.write(signature)
-    footter = struct.pack(SIGANTURE_FOOTER_FORMAT, signature_total_size,
+    footer = struct.pack(SIGNATURE_FOOTER_FORMAT, signature_total_size,
             0xffff, signature_total_size)
-    f_signed.write(footter)
+    f_signed.write(footer)
     f_signed.close()
 
 
@@ -160,12 +160,12 @@ def sign_ota_package(package_path, signed_package, private_key):
     data = create_encap_content_info(digest)
     signature = sign_digest(digest, private_key)
 
-    digest_fd = os.open("digest", os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o755)
+    digest_fd = os.open("digest", os.O_RDWR | os.O_CREAT, 0o755)
     digest_file = os.fdopen(digest_fd, 'wb')
     digest_file.write(digest)
     digest_file.close()
 
-    signatute_fd = os.open("signature", os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0o755)
+    signatute_fd = os.open("signature", os.O_RDWR | os.O_CREAT, 0o755)
     signatute_file = os.fdopen(signatute_fd, 'wb')
     signatute_file.write(signature)
     signatute_file.close()

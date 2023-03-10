@@ -16,7 +16,7 @@
 
 import hashlib
 from base64 import b64encode
-from build_pkcs7 import BLCOK_SIZE, sign_digest
+from build_pkcs7 import BLOCK_SIZE, sign_digest
 from log_exception import UPDATE_LOGGER
 from utils import OPTIONS_MANAGER
 
@@ -30,7 +30,7 @@ def sign_func_sha256(sign_file, private_key_file):
     """
     hash_sha256 = hashlib.sha256()
     with open(sign_file, 'rb') as file:
-        while chunk := file.read(BLCOK_SIZE):
+        while chunk := file.read(BLOCK_SIZE):
             hash_sha256.update(chunk)
     signature = sign_digest(hash_sha256.digest(), private_key_file)
     if signature == False:
