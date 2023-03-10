@@ -43,7 +43,7 @@ COMPONENT_INFO_FMT_SIZE = 5
 COMPONENT_VERSION_SIZE = 10
 COMPONENT_SIZE_FMT_SIZE = 8
 COMPONENT_DIGEST_SIZE = 32
-BLCOK_SIZE = 8192
+BLOCK_SIZE = 8192
 HEADER_TLV_TYPE = 0x11
 HEADER_TLV_TYPE_L2 = 0x01
 # signature algorithm
@@ -190,14 +190,14 @@ class CreatePackage(object):
         remain_len = self.component_offset
 
         package_file.seek(0)
-        while remain_len > BLCOK_SIZE:
-            hash_sha256.update(package_file.read(BLCOK_SIZE))
-            remain_len -= BLCOK_SIZE
+        while remain_len > BLOCK_SIZE:
+            hash_sha256.update(package_file.read(BLOCK_SIZE))
+            remain_len -= BLOCK_SIZE
         if remain_len > 0:
             hash_sha256.update(package_file.read(remain_len))
         return hash_sha256.digest()
 
-    def sign_digest_with_pss(self, digset):
+    def sign_digest_with_pss(self, digest):
         try:
             with open(self.key_path, 'rb') as f_r:
                 key_data = f_r.read()
@@ -210,12 +210,12 @@ class CreatePackage(object):
                 mgf=padding.MGF1(hashes.SHA256()),
                 salt_length=padding.PSS.MAX_LENGTH)
 
-            signature = private_key.sign(digset, pad, hashes.SHA256())
+            signature = private_key.sign(digest, pad, hashes.SHA256())
         except (OSError, ValueError):
             return False
         return signature
 
-    def sign_digest(self, digset):
+    def sign_digest(self, digest):
         try:
             with open(self.key_path, 'rb') as f_r:
                 key_data = f_r.read()
@@ -223,7 +223,7 @@ class CreatePackage(object):
                 key_data,
                 password=None,
                 backend=default_backend())
-            signature = private_key.sign(digset, padding.PKCS1v15(), hashes.SHA256())
+            signature = private_key.sign(digest, padding.PKCS1v15(), hashes.SHA256())
         except (OSError, ValueError):
             return False
         return signature
