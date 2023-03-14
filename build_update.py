@@ -618,6 +618,14 @@ def increment_image_processing(
                 "src image path: %s, tgt image path: %s" %
                 (each_src_image_path, each_tgt_image_path),
                 UPDATE_LOGGER.INFO_LOG)
+            OPTIONS_MANAGER.component_info_dict.pop(each_img)
+            OPTIONS_MANAGER.incremental_img_name_list.remove(each_img)
+            first_block_check_cmd = verse_script.first_block_check(each_img)
+            abort_cmd = verse_script.abort(each_img)
+            cmd = 'if ({first_block_check_cmd} != 0)' '{{\n    {abort_cmd}}}\n'.format(
+            first_block_check_cmd=first_block_check_cmd, abort_cmd=abort_cmd)
+            script_check_cmd_list.append(cmd)
+            continue
 
         src_generate_map = True
         tgt_generate_map = True
