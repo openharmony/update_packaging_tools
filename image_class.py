@@ -28,7 +28,6 @@ from utils import FILE_MAP_ZERO_KEY
 from utils import FILE_MAP_NONZERO_KEY
 from utils import FILE_MAP_COPY_KEY
 from utils import MAX_BLOCKS_PER_GROUP
-from utils import FORBIDEN_UPDATE_IMAGE_LIST
 
 
 class FullUpdateImage:
@@ -78,8 +77,7 @@ class FullUpdateImage:
                 image_write_cmd = \
                     self.verse_script.image_write(each_name, img_name, each_img.name)
                 cmd = '%s_WRITE_FLAG%s' % (each_name, image_write_cmd)
-                if each_name not in FORBIDEN_UPDATE_IMAGE_LIST:
-                    self.verse_script.add_command(cmd=cmd)
+                self.verse_script.add_command(cmd=cmd)
 
         UPDATE_LOGGER.print_log(
             "All full image processing completed! image count: %d" %

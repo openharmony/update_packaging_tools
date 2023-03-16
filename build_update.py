@@ -862,24 +862,6 @@ def main():
         OPTIONS_MANAGER.partition_file_obj = partition_file_obj
         OPTIONS_MANAGER.full_img_list = partitions_list
         OPTIONS_MANAGER.full_image_path_list = partitions_file_path_list
-        OPTIONS_MANAGER.two_step = False
-
-    # Upgrade the updater image.
-    if OPTIONS_MANAGER.two_step:
-        get_status_cmd = verse_script.get_status()
-        set_status_0_cmd = verse_script.set_status('0')
-        set_status_1_cmd = verse_script.set_status('1')
-        reboot_now_cmd = verse_script.reboot_now()
-        create_updater_script_command = \
-            '\n# ---- do updater partitions ----\n\n' \
-            'if ({get_status_cmd} == 0){{\nUPDATER_WRITE_FLAG\n' \
-            '    {set_status_1_cmd}    {reboot_now_cmd}}}\n' \
-            'else{{    \nALL_WRITE_FLAG\n    {set_status_0_cmd}}}'.format(
-                get_status_cmd=get_status_cmd,
-                set_status_1_cmd=set_status_1_cmd,
-                set_status_0_cmd=set_status_0_cmd,
-                reboot_now_cmd=reboot_now_cmd)
-        verse_script.add_command(create_updater_script_command)
 
     if incremental_processing(
             no_zip, partition_file, source_package, verse_script) is False:
