@@ -814,7 +814,7 @@ def main():
             clear_resource(err_clear=True)
             return
         UPDATE_LOGGER.print_log("Unpack update package .bin success!")
-        clear_resource(err_clear=True)
+        clear_resource()
         return
 
     if OPTIONS_MANAGER.sd_card:
