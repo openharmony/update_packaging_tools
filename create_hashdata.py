@@ -120,14 +120,10 @@ class CreateHash(object):
                 block_num = component_len // HASH_BLOCK_SIZE
                 component_name = component.component_addr.decode().ljust(COMPONENT_NAME_SIZE, "\0")
                 UPDATE_LOGGER.print_log("calc component hash  component name:%s %s" % (component_name,len(component_name)))
-                if component_len % HASH_BLOCK_SIZE > 0:
-                    self.hashdata += struct.pack(HASH_DATA_HEADER_FMT, component_name.encode(),
-                        (block_num + 1), component_len)
-                    UPDATE_LOGGER.print_log("calc component hash  block_num:%s" % (block_num + 1))
-                else:
-                    self.hashdata += struct.pack(HASH_DATA_HEADER_FMT, component_name.encode(),
-                        block_num, component_len)
-                    UPDATE_LOGGER.print_log("calc component hash  block_num:%s" % block_num)
+                total_block = block_num + 1 if component_len % HASH_BLOCK_SIZE > 0 else block_num
+                self.hashdata += struct.pack(HASH_DATA_HEADER_FMT, component_name.encode(),
+                    total_block, component_len)
+                UPDATE_LOGGER.print_log("calc component hash  block_num:%s" % total_block)
                 write_len = 0
                 for i in range(0, block_num):
                     component_file.seek(write_len)
