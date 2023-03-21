@@ -129,13 +129,13 @@ class CreateHash(object):
                     component_file.seek(write_len)
                     component_data = component_file.read(HASH_BLOCK_SIZE)
                     write_len += HASH_BLOCK_SIZE
-                    self.hashdata += struct.pack(HASH_DATA_ADDR_FMT, (i * HASH_BLOCK_SIZE + 1 if i != 0 else 0),
-                        write_len) + self.calculate_hash_data(component_data)
+                    self.hashdata += struct.pack(HASH_DATA_ADDR_FMT, (i * HASH_BLOCK_SIZE if i != 0 else 0),
+                        write_len - 1) + self.calculate_hash_data(component_data)
                 if component_len - write_len > 0 :
                     component_file.seek(write_len)
                     component_data = component_file.read(component_len - write_len)
-                    self.hashdata += struct.pack(HASH_DATA_ADDR_FMT, (write_len + 1 if write_len != 0 else 0),
-                        component_len) + self.calculate_hash_data(component_data)
+                    self.hashdata += struct.pack(HASH_DATA_ADDR_FMT, (write_len if write_len != 0 else 0),
+                        component_len - 1) + self.calculate_hash_data(component_data)
         except (struct.error, IOError):
             return False
         UPDATE_LOGGER.print_log("calc component hash complete  ComponentSize:%s" % component_len)
@@ -183,10 +183,10 @@ class CreateHash(object):
         UPDATE_LOGGER.print_log("parese hashdata sign complete")
         return True
 
-    def parse_print_hashdata(self):
-        hash_check_file_p = open("output/hash_check_file_parse", "wb+")
+    def parse_print_hashdata(self, save_path):
+        hash_check_file_p = open(os.path.join(save_path + "hash_check_file_parse"), "wb+")
         hash_check_file_p.write(("hash info:").encode())
-        hash_check_file_p.write((str(self.hash_type.value) + ' ' + str(self.hash_digest_size) + \
+        hash_check_file_p.write((HashType(self.hash_type.value).name + ' ' + str(self.hash_digest_size) + \
             ' ' + str(self.component_num) + ' ' + str(self.block_size) + '\n').encode())
 
         offset = 0

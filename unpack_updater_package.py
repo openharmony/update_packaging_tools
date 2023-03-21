@@ -133,7 +133,7 @@ class UnpackPackage(object):
             hash_check_data.parse_signdata(package_file.read(hash_sign_data_len))
             hash_info_offset += HASH_TLV_SIZE + hash_sign_data_len
 
-            hash_check_data.parse_print_hashdata()
+            hash_check_data.parse_print_hashdata(OPTIONS_MANAGER.target_package)
             self.component_offset = hash_info_offset
             UPDATE_LOGGER.print_log(
                         "parse hash check data success! size: %d" % hash_info_offset)
