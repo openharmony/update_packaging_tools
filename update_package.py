@@ -38,6 +38,7 @@ from utils import UPDATE_EXE_FILE_NAME
 from utils import TOTAL_SCRIPT_FILE_NAME
 from utils import EXTEND_COMPONENT_LIST
 from utils import LINUX_HASH_ALGORITHM_DICT
+from utils import UPDATE_BIN_FILE_NAME
 from utils import BUILD_TOOLS_FILE_NAME
 from utils import SIGN_PACKAGE_EVENT
 from utils import GENERATE_SIGNED_DATA_EVENT
@@ -103,23 +104,15 @@ def create_update_bin():
     component_dict = OPTIONS_MANAGER.component_info_dict
     full_image_file_obj_list = OPTIONS_MANAGER.full_image_file_obj_list
     full_img_list = OPTIONS_MANAGER.full_img_list
-    incremental_img_list = OPTIONS_MANAGER.incremental_img_list
-    incremental_image_file_obj_list = \
-        OPTIONS_MANAGER.incremental_image_file_obj_list
 
-    all_image_file_obj_list = \
-        incremental_image_file_obj_list + full_image_file_obj_list
     if not OPTIONS_MANAGER.not_l2:
         if OPTIONS_MANAGER.partition_file_obj is not None:
             all_image_name = \
-                EXTEND_COMPONENT_LIST + EXTEND_OPTIONAL_COMPONENT_LIST + \
-                incremental_img_list + full_img_list
+                EXTEND_COMPONENT_LIST + EXTEND_OPTIONAL_COMPONENT_LIST + full_img_list
         else:
-            all_image_name = \
-                EXTEND_COMPONENT_LIST + incremental_img_list + full_img_list
+            all_image_name = EXTEND_COMPONENT_LIST + full_img_list
     else:
-        all_image_name = \
-            incremental_img_list + full_img_list
+        all_image_name = full_img_list
     sort_component_dict = collect.OrderedDict()
     for each_image_name in all_image_name:
         sort_component_dict[each_image_name] = \
@@ -128,7 +121,7 @@ def create_update_bin():
     head_list = get_head_list(len(component_dict), head_value_list)
 
     component_list = get_component_list(
-        all_image_file_obj_list, component_dict)
+        full_image_file_obj_list, component_dict)
 
     save_patch = update_bin_obj.name.encode("utf-8")
     if OPTIONS_MANAGER.private_key == ON_SERVER:
@@ -456,7 +449,14 @@ def build_update_package(no_zip, update_package, prelude_script,
         zip_file.write(OPTIONS_MANAGER.update_bin_obj.name, "update.bin")
         # add build_tools.zip to update package
         zip_file.write(OPTIONS_MANAGER.build_tools_zip_obj.name, BUILD_TOOLS_FILE_NAME)
-        zip_file.close()
+        zip_file.write(OPTIONS_MANAGER.version_mbn_file_path, "version_list")
+        zip_file.write(OPTIONS_MANAGER.board_list_file_path, "board_list")
+
+        for package_patch_zip in OPTIONS_MANAGER.incremental_block_file_obj_dict.values():
+            package_patch_zip.package_block_patch(zip_file)
+
+        for partition, patch_obj in OPTIONS_MANAGER.incremental_image_file_obj_dict.items():
+            zip_file.write(patch_obj.name, partition + ".patch.dat")
 
         signed_package = os.path.join(
             update_package, "%s.zip" % update_file_name)

@@ -524,8 +524,6 @@ class PackagePatchZip:
 
         self.partition_file_obj = tempfile.NamedTemporaryFile(
             dir=OPTIONS_MANAGER.target_package, prefix="partition_patch-")
-        OPTIONS_MANAGER.incremental_image_file_obj_list.append(
-            self.partition_file_obj)
 
     def get_file_obj(self):
         """
@@ -534,20 +532,10 @@ class PackagePatchZip:
         return self.new_dat_file_obj, self.patch_dat_file_obj, \
             self.transfer_list_file_obj
 
-    def package_patch_zip(self):
-        """
-        Compress the partition diff patch calculation data as *.zip package.
-        """
-        self.partition_file_obj.seek(0)
-        self.patch_dat_file_obj.seek(0)
-        self.new_dat_file_obj.seek(0)
-        self.transfer_list_file_obj.seek(0)
-        
-        with zipfile.ZipFile(self.partition_file_obj.name, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            # add new.dat to {partition}.zip
-            zip_file.write(self.new_dat_file_obj.name, self.partition_new_dat_file_name)
-            # add patch.dat to {partition}.zip
-            zip_file.write(self.patch_dat_file_obj.name, self.partition_patch_dat_file_name)
-            # add transfer.list to {partition}.zip
-            zip_file.write(self.transfer_list_file_obj.name, self.partition_transfer_file_name)
-            UPDATE_LOGGER.print_log("Create %s.zip success!" % self.partition)
+    def package_block_patch(self, zip_file):
+        # add new.dat to ota.zip
+        zip_file.write(self.new_dat_file_obj.name, self.partition_new_dat_file_name)
+        # add patch.dat to ota.zip
+        zip_file.write(self.patch_dat_file_obj.name, self.partition_patch_dat_file_name)
+        # add transfer.list to ota.zip
+        zip_file.write(self.transfer_list_file_obj.name, self.partition_transfer_file_name)

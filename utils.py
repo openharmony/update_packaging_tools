@@ -33,6 +33,7 @@ from build_pkcs7 import sign_ota_package
 operation_path = os.path.dirname(os.path.realpath(__file__))
 PRODUCT = 'hi3516'
 BUILD_TOOLS_FILE_NAME = 'build_tools.zip'
+UPDATE_BIN_FILE_NAME = "update.bin"
 UPDATE_EXE_FILE_NAME = "updater_binary"
 
 SCRIPT_KEY_LIST = ['prelude', 'verse', 'refrain', 'ending']
@@ -178,7 +179,8 @@ class OptionsManager:
 
         # Incremental processing parameters
         self.incremental_content_len_list = []
-        self.incremental_image_file_obj_list = []
+        self.incremental_image_file_obj_dict = {}
+        self.incremental_block_file_obj_dict = {}
         self.incremental_temp_file_obj_list = []
         self.src_image = None
         self.tgt_image = None
@@ -301,7 +303,7 @@ def parse_update_config(xml_path):
 
     if not OPTIONS_MANAGER.not_l2:
         expand_component(component_dict)
-    if isinstance(component_info, OrderedDict):
+    if isinstance(component_info, OrderedDict) or isinstance(component_info, dict):
         component_info = [component_info]
     if component_info is None:
         ret_params = [[], {}, [], [], '', [], False]

@@ -564,8 +564,7 @@ def increment_image_diff_processing(
     """
     patch_file_obj = tempfile.NamedTemporaryFile(
             prefix="%s_patch.dat-" % partition, mode='wb')
-    OPTIONS_MANAGER.incremental_image_file_obj_list.append(
-            patch_file_obj)
+    OPTIONS_MANAGER.incremental_image_file_obj_dict[partition] = patch_file_obj
     cmd = [DIFF_EXE_PATH]
 
     cmd.extend(['-s', src_image_path, '-d', tgt_image_path,
@@ -618,7 +617,6 @@ def increment_image_processing(
                 "src image path: %s, tgt image path: %s" %
                 (each_src_image_path, each_tgt_image_path),
                 UPDATE_LOGGER.INFO_LOG)
-            OPTIONS_MANAGER.component_info_dict.pop(each_img)
             OPTIONS_MANAGER.incremental_img_name_list.remove(each_img)
             first_block_check_cmd = verse_script.first_block_check(each_img)
             abort_cmd = verse_script.abort(each_img)
@@ -675,9 +673,9 @@ def increment_image_processing(
             patch_package_process.PatchProcess(
                 each_img, tgt_image_class, src_image_class, actions_list)
         patch_process.patch_process()
-        patch_process.package_patch_zip.package_patch_zip()
         patch_process.write_script(each_img, script_check_cmd_list,
                                    script_write_cmd_list, verse_script)
+        OPTIONS_MANAGER.incremental_block_file_obj_dict[each_img] = patch_process.package_patch_zip
     if block_diff > 0:
         if not check_patch_file(patch_process):
             UPDATE_LOGGER.print_log(
