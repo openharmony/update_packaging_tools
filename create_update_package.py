@@ -275,35 +275,34 @@ class CreatePackage(object):
                 ".bin package signing success! SignOffset: %s" % self.sign_offset)
             return True
 
-    def sign_header(self, sign_algo, hash_check_data):
-        with open(self.save_path, "rb+") as package_file:
-            # calculate hash for .bin package
-            digest = self.calculate_header_hash(package_file)
-            if not digest:
-                UPDATE_LOGGER.print_log("calculate hash for .bin package failed",
-                    log_type=UPDATE_LOGGER.ERROR_LOG)
-                return False
+    def sign_header(self, sign_algo, hash_check_data, package_file):
+        # calculate hash for .bin package
+        digest = self.calculate_header_hash(package_file)
+        if not digest:
+            UPDATE_LOGGER.print_log("calculate hash for .bin package failed",
+                log_type=UPDATE_LOGGER.ERROR_LOG)
+            return False
 
-            # sign .bin header
-            if sign_algo == SIGN_ALGO_RSA:
-                signature = self.sign_digest(digest)
-            elif sign_algo == SIGN_ALGO_PSS:
-                signature = self.sign_digest_with_pss(digest)
-            else:
-                UPDATE_LOGGER.print_log("invalid sign_algo!", log_type=UPDATE_LOGGER.ERROR_LOG)
-                return False
-            if not signature:
-                UPDATE_LOGGER.print_log("sign .bin package failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
-                return False
+        # sign .bin header
+        if sign_algo == SIGN_ALGO_RSA:
+            signature = self.sign_digest(digest)
+        elif sign_algo == SIGN_ALGO_PSS:
+            signature = self.sign_digest_with_pss(digest)
+        else:
+            UPDATE_LOGGER.print_log("invalid sign_algo!", log_type=UPDATE_LOGGER.ERROR_LOG)
+            return False
+        if not signature:
+            UPDATE_LOGGER.print_log("sign .bin package failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
+            return False
 
-            # write signed .bin header
-            hash_check_data.write_signdata(signature)
-            package_file.seek(self.hash_info_offset)
-            package_file.write(hash_check_data.signdata)
-            self.hash_info_offset += len(hash_check_data.signdata)
-            UPDATE_LOGGER.print_log(
-                ".bin package header signing success! SignOffset: %s" % self.hash_info_offset)
-            return True
+        # write signed .bin header
+        hash_check_data.write_signdata(signature)
+        package_file.seek(self.hash_info_offset)
+        package_file.write(hash_check_data.signdata)
+        self.hash_info_offset += len(hash_check_data.signdata)
+        UPDATE_LOGGER.print_log(
+            ".bin package header signing success! SignOffset: %s" % self.hash_info_offset)
+        return True
 
     def create_package(self):
         """
@@ -344,7 +343,8 @@ class CreatePackage(object):
             try:
                 # Add descriptPackageId to package
                 package_file.seek(self.compinfo_offset)
-                package_file.write(self.head_list.describe_package_id)
+                package_file.write(
+                    self.head_list.describe_package_id.decode().ljust(UPGRADE_RESERVE_LEN, "\0").encode())
             except IOError:
                 UPDATE_LOGGER.print_log(
                     "Add descriptPackageId failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
@@ -376,7 +376,7 @@ class CreatePackage(object):
                     UPDATE_LOGGER.print_log(
                         "Add hash check data failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
                     return False
-                self.sign_header(SIGN_ALGO_RSA, hash_check_data)
+                self.sign_header(SIGN_ALGO_RSA, hash_check_data, package_file)
                 self.component_offset = self.hash_info_offset
 
             for i in range(0, self.head_list.entry_count):
