@@ -222,11 +222,6 @@ class UnpackPackage(object):
                     "parse package file failed!", UPDATE_LOGGER.ERROR_LOG)
                 return False
 
-            if not self.parse_hash_check_data(package_file):
-                UPDATE_LOGGER.print_log(
-                        "parse hash check data failed!", UPDATE_LOGGER.ERROR_LOG)
-                return False
-
             for image_id in range(0, self.count):
                 UPDATE_LOGGER.print_log("Start to parse component_%d" % image_id)
                 if not self.create_image_file(package_file):
