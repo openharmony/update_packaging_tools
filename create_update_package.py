@@ -313,9 +313,8 @@ class CreatePackage(object):
             UPDATE_LOGGER.print_log("verify param failed!", UPDATE_LOGGER.ERROR_LOG)
             return False
 
-        if OPTIONS_MANAGER.sd_card:
-            hash_check_data = CreateHash(HashType.SHA256, self.head_list.entry_count)
-            hash_check_data.write_hashinfo()
+        hash_check_data = CreateHash(HashType.SHA256, self.head_list.entry_count)
+        hash_check_data.write_hashinfo()
         package_fd = os.open(self.save_path, os.O_RDWR | os.O_CREAT, 0o755)
         with os.fdopen(package_fd, "wb+") as package_file:
             # Add information to package
@@ -344,41 +343,27 @@ class CreatePackage(object):
                 # Add descriptPackageId to package
                 package_file.seek(self.compinfo_offset)
                 package_file.write(
-                    self.head_list.describe_package_id.decode().ljust(UPGRADE_RESERVE_LEN, "\0").encode())
+                    (self.head_list.describe_package_id.decode().ljust(UPGRADE_RESERVE_LEN, "\0")).encode())
             except IOError:
                 UPDATE_LOGGER.print_log(
                     "Add descriptPackageId failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
                 return False
-            try:
-                # Sign
-                self.sign_offset = self.compinfo_offset + UPGRADE_RESERVE_LEN
-                package_file.seek(self.sign_offset)
-                sign_buffer = bytes(UPGRADE_SIGNATURE_LEN)
-                package_file.write(sign_buffer)
-            except IOError:
-                UPDATE_LOGGER.print_log(
-                    "Add Sign failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
-                return False
 
+            self.hash_info_offset = self.compinfo_offset + UPGRADE_RESERVE_LEN
             if OPTIONS_MANAGER.sd_card:
                 try:
                     # Add hash check data to package
                     hash_check_data.write_hashdata()
-                    self.hash_info_offset = self.sign_offset +  UPGRADE_SIGNATURE_LEN
                     package_file.seek(self.hash_info_offset)
-                    package_file.write(hash_check_data.hashinfo + hash_check_data.hashdata)
-                    self.hash_info_offset += len(hash_check_data.hashinfo + hash_check_data.hashdata)
+                    package_file.write(hash_check_data.hashinfo_value + hash_check_data.hashdata)
+                    self.hash_info_offset += len(hash_check_data.hashinfo_value + hash_check_data.hashdata)
 
-                    hash_check_file_b = open("output/hash_check_file_bytes", "wb+")
-                    hash_check_file_b.write(hash_check_data.hashinfo + hash_check_data.hashdata + hash_check_data.signdata)
-                    hash_check_file_b.close()
                 except IOError:
                     UPDATE_LOGGER.print_log(
                         "Add hash check data failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
                     return False
-                self.sign_header(SIGN_ALGO_RSA, hash_check_data, package_file)
-                self.component_offset = self.hash_info_offset
-
+            self.sign_header(SIGN_ALGO_RSA, hash_check_data, package_file)
+            self.component_offset = self.hash_info_offset
             for i in range(0, self.head_list.entry_count):
                 if not self.write_component(self.component_list[i], package_file):
                     UPDATE_LOGGER.print_log("write component failed: %s"

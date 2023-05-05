@@ -62,7 +62,7 @@ class CreateHash(object):
         self.hash_digest_size = HashAlgo[hash_type]().digest_size
         self.component_num = count
         self.block_size = HASH_BLOCK_SIZE
-        self.hashinfo = bytes()
+        self.hashinfo_value = bytes()
         self.hashdata = bytes()
         self.signdata = bytes()
         self.hashdata_list = []
@@ -77,7 +77,7 @@ class CreateHash(object):
             return False
 
         # write hashinfo
-        self.hashinfo = hashinfo_tlv + hashinfo_header
+        self.hashinfo_value = hashinfo_tlv + hashinfo_header
         return True
 
     def write_hashdata(self):
