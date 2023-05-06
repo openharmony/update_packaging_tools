@@ -676,15 +676,12 @@ def increment_image_processing(
         patch_process.write_script(each_img, script_check_cmd_list,
                                    script_write_cmd_list, verse_script)
         OPTIONS_MANAGER.incremental_block_file_obj_dict[each_img] = patch_process.package_patch_zip
-    if block_diff > 0:
+
         if not check_patch_file(patch_process):
             UPDATE_LOGGER.print_log(
                 'Verify the incremental result failed!',
                 UPDATE_LOGGER.ERROR_LOG)
             raise RuntimeError
-    UPDATE_LOGGER.print_log(
-            'Verify the incremental result successfully!',
-            UPDATE_LOGGER.INFO_LOG)
 
     verse_script.add_command(
         "\n# ---- start incremental check here ----\n")

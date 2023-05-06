@@ -539,12 +539,6 @@ def clear_file_obj(err_clear):
         for each_incremental_temp_obj in incremental_temp_file_obj_list:
             if each_incremental_temp_obj is not None:
                 each_incremental_temp_obj.close()
-    incremental_image_file_obj_list = \
-        OPTIONS_MANAGER.incremental_image_file_obj_list
-    if len(incremental_image_file_obj_list) != 0:
-        for each_incremental_obj in incremental_image_file_obj_list:
-            if each_incremental_obj is not None:
-                each_incremental_obj.close()
     opera_script_file_name_dict = OPTIONS_MANAGER.opera_script_file_name_dict
     for each_value in opera_script_file_name_dict.values():
         for each in each_value:

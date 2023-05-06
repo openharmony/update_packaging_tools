@@ -529,10 +529,16 @@ class PackagePatchZip:
         """
         Obtain file objects.
         """
+        self.new_dat_file_obj.flush()
+        self.patch_dat_file_obj.flush()
+        self.transfer_list_file_obj.flush()
         return self.new_dat_file_obj, self.patch_dat_file_obj, \
             self.transfer_list_file_obj
 
     def package_block_patch(self, zip_file):
+        self.new_dat_file_obj.flush()
+        self.patch_dat_file_obj.flush()
+        self.transfer_list_file_obj.flush()
         # add new.dat to ota.zip
         zip_file.write(self.new_dat_file_obj.name, self.partition_new_dat_file_name)
         # add patch.dat to ota.zip
