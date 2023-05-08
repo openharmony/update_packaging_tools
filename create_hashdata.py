@@ -22,6 +22,15 @@ import hashlib
 import enum
 from log_exception import UPDATE_LOGGER
 
+# hash data sample
+# hash info module:
+# hash info:1 32 3 4194304
+# hash value module:
+# /version_list                   (32bytes)
+# 1 176
+# 1 176 bf10259a1fc1b2f780a49ce6XXXXXXXX
+# hash sign module:
+# hash sign:45ef8ec12e56e3b82c9a05XXXXXX
 
 HashType = enum.Enum('HashType', ('SHA256', 'SHA384', 'SHA512'))
 HashAlgo = {HashType.SHA256 : hashlib.sha256,
