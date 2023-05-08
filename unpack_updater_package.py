@@ -105,44 +105,6 @@ class UnpackPackage(object):
                     "parse package file success! components: %d" % self.count)
         return True
 
-    def parse_hash_check_data(self, package_file):
-        if not OPTIONS_MANAGER.sd_card:
-            return True
-        try:
-            package_file.seek(COMPINFO_LEN_OFFSET)
-            compinfo_len = int.from_bytes(package_file.read(COMPINFO_LEN_SIZE), "little")
-
-            hash_info_offset = COMPINFO_LEN_OFFSET + COMPINFO_LEN_SIZE + compinfo_len + \
-                UPGRADE_RESERVE_LEN + UPGRADE_SIGNATURE_LEN
-            hash_check_data = CreateHash(HashType.SHA256, 0)
-            package_file.seek(hash_info_offset + HASH_TLV_SIZE)
-            hashinfo_data = package_file.read(UPGRADE_HASHINFO_SIZE)
-            hash_check_data.parse_hashinfo(hashinfo_data)
-            hash_info_offset += HASH_TLV_SIZE + UPGRADE_HASHINFO_SIZE
-
-            package_file.seek(hash_info_offset + HASH_TYPE_SIZE)
-            hashdata_len = int.from_bytes(package_file.read(HASH_LENGTH_SIZE), "little")
-            package_file.seek(hash_info_offset + HASH_TLV_SIZE)
-            hash_data = package_file.read(hashdata_len)
-            hash_check_data.parse_hashdata(hash_data)
-            hash_info_offset += HASH_TLV_SIZE + hashdata_len
-
-            package_file.seek(hash_info_offset + HASH_TYPE_SIZE)
-            hash_sign_data_len = int.from_bytes(package_file.read(HASH_LENGTH_SIZE), "little")
-            package_file.seek(hash_info_offset + HASH_TLV_SIZE)
-            hash_check_data.parse_signdata(package_file.read(hash_sign_data_len))
-            hash_info_offset += HASH_TLV_SIZE + hash_sign_data_len
-
-            hash_check_data.parse_print_hashdata(OPTIONS_MANAGER.target_package)
-            self.component_offset = hash_info_offset
-            UPDATE_LOGGER.print_log(
-                        "parse hash check data success! size: %d" % hash_info_offset)
-        except (IOError):
-            UPDATE_LOGGER.print_log(
-                "parse hash check data failed!", UPDATE_LOGGER.ERROR_LOG)
-            return False
-        return True
-
     def parse_component(self, package_file):
         try:
             package_file.seek(self.addr_offset)
