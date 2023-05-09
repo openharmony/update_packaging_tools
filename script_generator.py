@@ -292,6 +292,7 @@ def get_progress_value(distributable_value=100):
     full_img_list = OPTIONS_MANAGER.full_img_list
     incremental_img_list = OPTIONS_MANAGER.incremental_img_list
     file_size_list = []
+    each_img_size = 0
     if len(full_img_list) == 0 and len(incremental_img_list) == 0:
         UPDATE_LOGGER.print_log(
             "get progress value failed! > getting progress value failed!",
@@ -302,7 +303,7 @@ def get_progress_value(distributable_value=100):
         if partition in OPTIONS_MANAGER.incremental_image_file_obj_dict:
             file_obj = OPTIONS_MANAGER.incremental_image_file_obj_dict[partition]
             each_img_size = os.path.getsize(file_obj.name)
-        else:
+        elif partition in OPTIONS_MANAGER.incremental_block_file_obj_dict:
             new_dat_file_obj, patch_dat_file_obj, transfer_list_file_obj =\
                 OPTIONS_MANAGER.incremental_block_file_obj_dict[partition].get_file_obj()
             each_img_size = os.path.getsize(new_dat_file_obj.name) + os.path.getsize(patch_dat_file_obj.name)

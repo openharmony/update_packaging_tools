@@ -457,6 +457,7 @@ def build_update_package(no_zip, update_package, prelude_script,
 
         for partition, patch_obj in OPTIONS_MANAGER.incremental_image_file_obj_dict.items():
             zip_file.write(patch_obj.name, "%s.patch.dat" % partition)
+        zip_file.close()
 
         signed_package = os.path.join(
             update_package, "%s.zip" % update_file_name)

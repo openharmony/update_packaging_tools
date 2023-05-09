@@ -311,7 +311,6 @@ def parse_update_config(xml_path):
     for component in component_info:
         component_list = list(component.values())
         component_list.pop()
-        component_dict[component['@compAddr']] = component_list
 
         if component['@compAddr'] in (whole_list + difference_list):
             UPDATE_LOGGER.print_log("This component %s  repeats!" %
@@ -327,6 +326,7 @@ def parse_update_config(xml_path):
             tem_path = os.path.join(OPTIONS_MANAGER.target_package_dir,
                                     component.get("#text", None))
             full_image_path_list.append(tem_path)
+            component_dict[component['@compAddr']] = component_list
         elif component['@compType'] == '1':
             difference_list.append(component['@compAddr'])
             OPTIONS_MANAGER.incremental_img_name_list.\
@@ -470,7 +470,6 @@ def clear_options():
 
     # Incremental processing parameters
     OPTIONS_MANAGER.incremental_content_len_list = []
-    OPTIONS_MANAGER.incremental_image_file_obj_list = []
     OPTIONS_MANAGER.incremental_temp_file_obj_list = []
 
     # Script parameters
