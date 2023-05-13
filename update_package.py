@@ -38,6 +38,7 @@ from utils import UPDATE_EXE_FILE_NAME
 from utils import TOTAL_SCRIPT_FILE_NAME
 from utils import EXTEND_COMPONENT_LIST
 from utils import LINUX_HASH_ALGORITHM_DICT
+from utils import UPDATE_BIN_FILE_NAME
 from utils import BUILD_TOOLS_FILE_NAME
 from utils import SIGN_PACKAGE_EVENT
 from utils import GENERATE_SIGNED_DATA_EVENT
@@ -103,23 +104,15 @@ def create_update_bin():
     component_dict = OPTIONS_MANAGER.component_info_dict
     full_image_file_obj_list = OPTIONS_MANAGER.full_image_file_obj_list
     full_img_list = OPTIONS_MANAGER.full_img_list
-    incremental_img_list = OPTIONS_MANAGER.incremental_img_list
-    incremental_image_file_obj_list = \
-        OPTIONS_MANAGER.incremental_image_file_obj_list
 
-    all_image_file_obj_list = \
-        incremental_image_file_obj_list + full_image_file_obj_list
     if not OPTIONS_MANAGER.not_l2:
         if OPTIONS_MANAGER.partition_file_obj is not None:
             all_image_name = \
-                EXTEND_COMPONENT_LIST + EXTEND_OPTIONAL_COMPONENT_LIST + \
-                incremental_img_list + full_img_list
+                EXTEND_COMPONENT_LIST + EXTEND_OPTIONAL_COMPONENT_LIST + full_img_list
         else:
-            all_image_name = \
-                EXTEND_COMPONENT_LIST + incremental_img_list + full_img_list
+            all_image_name = EXTEND_COMPONENT_LIST + full_img_list
     else:
-        all_image_name = \
-            incremental_img_list + full_img_list
+        all_image_name = full_img_list
     sort_component_dict = collect.OrderedDict()
     for each_image_name in all_image_name:
         sort_component_dict[each_image_name] = \
@@ -128,7 +121,7 @@ def create_update_bin():
     head_list = get_head_list(len(component_dict), head_value_list)
 
     component_list = get_component_list(
-        all_image_file_obj_list, component_dict)
+        full_image_file_obj_list, component_dict)
 
     save_patch = update_bin_obj.name.encode("utf-8")
     if OPTIONS_MANAGER.private_key == ON_SERVER:
@@ -384,6 +377,32 @@ def create_build_tools_zip():
     return file_obj
 
 
+def do_zip_update_package():
+    zip_file = zipfile.ZipFile(OPTIONS_MANAGER.update_package_file_path,
+                               'w', zipfile.ZIP_DEFLATED, allowZip64=True)
+    # add update.bin to update package
+    zip_file.write(OPTIONS_MANAGER.update_bin_obj.name, "update.bin")
+    # add build_tools.zip to update package
+    zip_file.write(OPTIONS_MANAGER.build_tools_zip_obj.name, BUILD_TOOLS_FILE_NAME)
+
+    zip_file.write(OPTIONS_MANAGER.version_mbn_file_path, "version_list")
+    zip_file.write(OPTIONS_MANAGER.board_list_file_path, "board_list")
+
+    if OPTIONS_MANAGER.max_stash_size != 0:
+        max_stash_file_obj = tempfile.NamedTemporaryFile(mode="w+")
+        max_stash_file_obj.write(str(OPTIONS_MANAGER.max_stash_size))
+        max_stash_file_obj.flush()
+        zip_file.write(max_stash_file_obj.name, "all_max_stash")
+
+    for package_patch_zip in OPTIONS_MANAGER.incremental_block_file_obj_dict.values():
+        package_patch_zip.package_block_patch(zip_file)
+
+    for partition, patch_obj in OPTIONS_MANAGER.incremental_image_file_obj_dict.items():
+        zip_file.write(patch_obj.name, "%s.patch.dat" % partition)
+
+    zip_file.close()
+
+
 def create_hsd_for_build_tools(zip_file, files_to_sign):
     """
     generate hash signed data for build_tools.zip
@@ -451,12 +470,7 @@ def build_update_package(no_zip, update_package, prelude_script,
             return False
         OPTIONS_MANAGER.build_tools_zip_obj = build_tools_zip_obj
 
-        zip_file = zipfile.ZipFile(update_package_path, 'w', zipfile.ZIP_DEFLATED, allowZip64=True)
-        # add update.bin to update package
-        zip_file.write(OPTIONS_MANAGER.update_bin_obj.name, "update.bin")
-        # add build_tools.zip to update package
-        zip_file.write(OPTIONS_MANAGER.build_tools_zip_obj.name, BUILD_TOOLS_FILE_NAME)
-        zip_file.close()
+        do_zip_update_package()
 
         signed_package = os.path.join(
             update_package, "%s.zip" % update_file_name)
