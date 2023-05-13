@@ -200,6 +200,7 @@ class PatchProcess:
         transfer_content = self.get_transfer_content(
             max_stashed_blocks, total_blocks_count, transfer_content)
         transfer_list_file_obj.write(transfer_content.encode())
+        OPTIONS_MANAGER.max_stash_size += max_stashed_blocks * 4096
 
     @staticmethod
     def get_transfer_content(max_stashed_blocks, total_blocks_count,
