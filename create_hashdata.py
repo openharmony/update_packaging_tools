@@ -171,7 +171,7 @@ class CreateHash(object):
                 img_name, hash_num, img_size = struct.unpack(HASH_DATA_HEADER_FMT,
                     data[offset: HASH_DATA_HEADER_SIZE + offset])
                 UPDATE_LOGGER.print_log("parese hashinfo complete, %s %d %d" % (img_name,
-                hash_num, img_size))
+                    hash_num, img_size))
                 offset += HASH_DATA_HEADER_SIZE
                 self.hashdata_list.append((img_name.decode(), hash_num, img_size))
                 for j in range(0, hash_num):
