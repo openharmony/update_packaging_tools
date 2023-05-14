@@ -97,7 +97,7 @@ class CreateHash(object):
             UPDATE_LOGGER.print_log("Pack fail!", log_type=UPDATE_LOGGER.ERROR_LOG)
             return False
 
-        UPDATE_LOGGER.print_log("Write hashdata hash len %s" % hashdata_len)
+        UPDATE_LOGGER.print_log("Write hashdata hash len %d" % hashdata_len)
         # write hashdata
         self.hashdata = hashdata_tlv + self.hashdata
         UPDATE_LOGGER.print_log("Write hashdata hash tlv complete")
@@ -128,11 +128,11 @@ class CreateHash(object):
                 component_len = os.path.getsize(component.file_path)
                 block_num = component_len // HASH_BLOCK_SIZE
                 component_name = component.component_addr.decode().ljust(COMPONENT_NAME_SIZE, "\0")
-                UPDATE_LOGGER.print_log("calc component hash  component name:%s %s" % (component_name,len(component_name)))
+                UPDATE_LOGGER.print_log("calc component hash  component name:%s %d" % (component_name,len(component_name)))
                 total_block = block_num + 1 if component_len % HASH_BLOCK_SIZE > 0 else block_num
                 self.hashdata += struct.pack(HASH_DATA_HEADER_FMT, component_name.encode(),
                     total_block, component_len)
-                UPDATE_LOGGER.print_log("calc component hash  block_num:%s" % total_block)
+                UPDATE_LOGGER.print_log("calc component hash  block_num:%d" % total_block)
                 write_len = 0
                 for i in range(0, block_num):
                     component_file.seek(write_len)
@@ -147,7 +147,7 @@ class CreateHash(object):
                         component_len - 1) + self.calculate_hash_data(component_data)
         except (struct.error, IOError):
             return False
-        UPDATE_LOGGER.print_log("calc component hash complete  ComponentSize:%s" % component_len)
+        UPDATE_LOGGER.print_log("calc component hash complete  ComponentSize:%d" % component_len)
         return True
 
     def parse_hashinfo(self, data):
@@ -160,7 +160,7 @@ class CreateHash(object):
         except struct.error:
             return False
 
-        UPDATE_LOGGER.print_log("parese hashinfo complete, %s %s %s %s" % (hash_type_value,
+        UPDATE_LOGGER.print_log("parese hashinfo complete, %d %d %d %d" % (hash_type_value,
             self.hash_digest_size, self.component_num, self.block_size))
         return True
 
@@ -170,7 +170,7 @@ class CreateHash(object):
             for i in range(0, self.component_num):
                 img_name, hash_num, img_size = struct.unpack(HASH_DATA_HEADER_FMT,
                     data[offset: HASH_DATA_HEADER_SIZE + offset])
-                UPDATE_LOGGER.print_log("parese hashinfo complete, %s %s %s" % (img_name,
+                UPDATE_LOGGER.print_log("parese hashinfo complete, %s %d %d" % (img_name,
                 hash_num, img_size))
                 offset += HASH_DATA_HEADER_SIZE
                 self.hashdata_list.append((img_name.decode(), hash_num, img_size))
