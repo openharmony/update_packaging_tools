@@ -27,10 +27,10 @@ from log_exception import VendorExpandError
 from log_exception import UPDATE_LOGGER
 from utils import OPTIONS_MANAGER
 from utils import PARTITION_FILE
-from utils import TWO_STEP
 from utils import TOTAL_SCRIPT_FILE_NAME
 from utils import SCRIPT_FILE_NAME
 from utils import SCRIPT_KEY_LIST
+from utils import UPDATE_BIN_FILE_NAME
 
 
 class Script:
@@ -231,6 +231,10 @@ class VerseScript(Script):
         """
         cmd = 'update_partitions("/%s");\n' % PARTITION_FILE
         return cmd
+    
+    def full_image_update(self, update_file_name):
+        cmd = 'update_from_bin("%s");\n' % update_file_name
+        return cmd
 
 
 class RefrainScript(Script):
@@ -288,31 +292,29 @@ def get_progress_value(distributable_value=100):
     full_img_list = OPTIONS_MANAGER.full_img_list
     incremental_img_list = OPTIONS_MANAGER.incremental_img_list
     file_size_list = []
+    each_img_size = 0
     if len(full_img_list) == 0 and len(incremental_img_list) == 0:
         UPDATE_LOGGER.print_log(
             "get progress value failed! > getting progress value failed!",
             UPDATE_LOGGER.ERROR_LOG)
         return False
-    for idx, _ in enumerate(incremental_img_list):
+    for partition in incremental_img_list:
         # Obtain the size of the incremental image file.
-        if OPTIONS_MANAGER.two_step and incremental_img_list[idx] == TWO_STEP:
-            # Updater images are not involved in progress calculation.
-            incremental_img_list.remove(TWO_STEP)
-            continue
-        file_obj = OPTIONS_MANAGER.incremental_image_file_obj_list[idx]
-        each_img_size = os.path.getsize(file_obj.name)
+        if partition in OPTIONS_MANAGER.incremental_image_file_obj_dict:
+            file_obj = OPTIONS_MANAGER.incremental_image_file_obj_dict[partition]
+            each_img_size = os.path.getsize(file_obj.name)
+        elif partition in OPTIONS_MANAGER.incremental_block_file_obj_dict:
+            new_dat_file_obj, patch_dat_file_obj, transfer_list_file_obj =\
+                OPTIONS_MANAGER.incremental_block_file_obj_dict[partition].get_file_obj()
+            each_img_size = os.path.getsize(new_dat_file_obj.name) + os.path.getsize(patch_dat_file_obj.name)
         file_size_list.append(each_img_size)
 
+    total_full_img_size = 0
     for idx, _ in enumerate(full_img_list):
         # Obtain the size of the full image file.
-        if OPTIONS_MANAGER.two_step and full_img_list[idx] == TWO_STEP:
-            # Updater images are not involved in progress calculation.
-            continue
         file_obj = OPTIONS_MANAGER.full_image_file_obj_list[idx]
-        each_img_size = os.path.getsize(file_obj.name)
-        file_size_list.append(each_img_size)
-    if OPTIONS_MANAGER.two_step and TWO_STEP in full_img_list:
-        full_img_list.remove(TWO_STEP)
+        total_full_img_size += os.path.getsize(file_obj.name)
+    file_size_list.append(total_full_img_size)
 
     proportion_value_list = get_proportion_value_list(
         file_size_list, distributable_value=distributable_value)
@@ -320,7 +322,7 @@ def get_progress_value(distributable_value=100):
     adjusted_proportion_value_list = adjust_proportion_value_list(
         proportion_value_list, distributable_value)
 
-    all_img_list = incremental_img_list + full_img_list
+    all_img_list = incremental_img_list + [UPDATE_BIN_FILE_NAME]
     current_progress = 40
     for idx, each_img in enumerate(all_img_list):
         temp_progress = current_progress + adjusted_proportion_value_list[idx]
@@ -395,26 +397,7 @@ def create_script(prelude_script, verse_script,
         return False
     verse_script_content_list = verse_script.get_script()
     updater_content = []
-    if OPTIONS_MANAGER.two_step:
-        for idx, each_cmd in enumerate(verse_script_content_list[1:]):
-            if "/%s" % TWO_STEP in each_cmd:
-                updater_content.append(each_cmd)
-                each_cmd = \
-                    '\n'.join(
-                        ['    %s' % each for each in each_cmd.split('\n')])
-                verse_script_content_list[0] = \
-                    verse_script_content_list[0].replace(
-                        "UPDATER_WRITE_FLAG",
-                        "%s\nUPDATER_WRITE_FLAG" % each_cmd)
-        verse_script_content_list[0] = \
-            verse_script_content_list[0].replace("UPDATER_WRITE_FLAG", "")
-        verse_script_content_list[0] = \
-            verse_script_content_list[0].replace("updater_WRITE_FLAG", "")
-        for each in updater_content:
-            verse_script_content_list.remove(each)
-        verse_script_content = '\n'.join(verse_script_content_list[1:])
-    else:
-        verse_script_content = '\n'.join(verse_script_content_list)
+    verse_script_content = '\n'.join(verse_script_content_list)
 
     for key, value in progress_value_dict.items():
         show_progress_content = \
@@ -422,11 +405,6 @@ def create_script(prelude_script, verse_script,
         verse_script_content = \
             re.sub(r'%s_WRITE_FLAG' % key, '%s' % show_progress_content,
                    verse_script_content, count=1)
-    if OPTIONS_MANAGER.two_step:
-        verse_script_content = '\n'.join(
-            ['    %s' % each for each in verse_script_content.split('\n')])
-        verse_script_content = verse_script_content_list[0].replace(
-            "ALL_WRITE_FLAG", verse_script_content)
     # Generate the verse script.
     write_script(verse_script_content, 'verse')
     # Generate the refrain script.

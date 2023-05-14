@@ -111,10 +111,9 @@ class TestScriptGenerator(unittest.TestCase):
         create_file(file_path, get_target_vendor_data())
         with open(file_path) as wo_f:
             file_obj = wo_f
-        OPTIONS_MANAGER.two_step = True
         OPTIONS_MANAGER.full_img_list = []
         OPTIONS_MANAGER.incremental_img_list = ['vendor', 'updater']
-        OPTIONS_MANAGER.incremental_image_file_obj_list = [file_obj]
+        OPTIONS_MANAGER.incremental_image_file_obj_dict['vendor'] = file_obj
         progress_value_dict = get_progress_value(distributable_value=60)
         check_re = len(progress_value_dict) != 0
         self.assertEqual(check_re, True)

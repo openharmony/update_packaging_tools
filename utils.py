@@ -33,6 +33,7 @@ from build_pkcs7 import sign_ota_package
 operation_path = os.path.dirname(os.path.realpath(__file__))
 PRODUCT = 'hi3516'
 BUILD_TOOLS_FILE_NAME = 'build_tools.zip'
+UPDATE_BIN_FILE_NAME = "update.bin"
 UPDATE_EXE_FILE_NAME = "updater_binary"
 
 SCRIPT_KEY_LIST = ['prelude', 'verse', 'refrain', 'ending']
@@ -71,15 +72,11 @@ FILE_MAP_COPY_KEY = "__COPY"
 
 MAX_BLOCKS_PER_GROUP = BLOCK_LIMIT = 1024
 PER_BLOCK_SIZE = 4096
-TWO_STEP = "updater"
 
 VERSE_SCRIPT_EVENT = 0
 INC_IMAGE_EVENT = 1
 SIGN_PACKAGE_EVENT = 2
 GENERATE_SIGNED_DATA_EVENT = 6 # sign build tools files to get hash_signed_data
-
-# Image file can not support update.
-FORBIDEN_UPDATE_IMAGE_LIST = ["updater_boot", "updater_b", "ptable"]
 
 # 1000000: max number of function recursion depth
 MAXIMUM_RECURSION_DEPTH = 1000000
@@ -172,7 +169,6 @@ class OptionsManager:
         self.incremental_img_name_list = []
         self.target_package_version = None
         self.source_package_version = None
-        self.two_step = False
         self.full_image_path_list = []
 
         self.partition_file_obj = None
@@ -183,8 +179,10 @@ class OptionsManager:
 
         # Incremental processing parameters
         self.incremental_content_len_list = []
-        self.incremental_image_file_obj_list = []
+        self.incremental_image_file_obj_dict = {}
+        self.incremental_block_file_obj_dict = {}
         self.incremental_temp_file_obj_list = []
+        self.max_stash_size = 0
         self.src_image = None
         self.tgt_image = None
 
@@ -282,7 +280,6 @@ def parse_update_config(xml_path):
             full_img_list: full image list
             incremental_img_list: incremental image list
     """
-    two_step = False
     if os.path.exists(xml_path):
         with open(xml_path, 'r') as xml_file:
             xml_str = xml_file.read()
@@ -307,7 +304,7 @@ def parse_update_config(xml_path):
 
     if not OPTIONS_MANAGER.not_l2:
         expand_component(component_dict)
-    if isinstance(component_info, OrderedDict):
+    if isinstance(component_info, OrderedDict) or isinstance(component_info, dict):
         component_info = [component_info]
     if component_info is None:
         ret_params = [[], {}, [], [], '', [], False]
@@ -315,7 +312,6 @@ def parse_update_config(xml_path):
     for component in component_info:
         component_list = list(component.values())
         component_list.pop()
-        component_dict[component['@compAddr']] = component_list
 
         if component['@compAddr'] in (whole_list + difference_list):
             UPDATE_LOGGER.print_log("This component %s  repeats!" %
@@ -331,18 +327,16 @@ def parse_update_config(xml_path):
             tem_path = os.path.join(OPTIONS_MANAGER.target_package_dir,
                                     component.get("#text", None))
             full_image_path_list.append(tem_path)
+            component_dict[component['@compAddr']] = component_list
         elif component['@compType'] == '1':
             difference_list.append(component['@compAddr'])
             OPTIONS_MANAGER.incremental_img_name_list.\
                 append(split_img_name(component['#text']))
 
-        if component['@compAddr'] == TWO_STEP:
-            two_step = True
-
     UPDATE_LOGGER.print_log('XML file parsing completed!')
     ret_params = [head_list, component_dict,
                   whole_list, difference_list, package_version,
-                  full_image_path_list, two_step]
+                  full_image_path_list]
     return ret_params
 
 
@@ -477,7 +471,6 @@ def clear_options():
 
     # Incremental processing parameters
     OPTIONS_MANAGER.incremental_content_len_list = []
-    OPTIONS_MANAGER.incremental_image_file_obj_list = []
     OPTIONS_MANAGER.incremental_temp_file_obj_list = []
 
     # Script parameters
@@ -546,12 +539,6 @@ def clear_file_obj(err_clear):
         for each_incremental_temp_obj in incremental_temp_file_obj_list:
             if each_incremental_temp_obj is not None:
                 each_incremental_temp_obj.close()
-    incremental_image_file_obj_list = \
-        OPTIONS_MANAGER.incremental_image_file_obj_list
-    if len(incremental_image_file_obj_list) != 0:
-        for each_incremental_obj in incremental_image_file_obj_list:
-            if each_incremental_obj is not None:
-                each_incremental_obj.close()
     opera_script_file_name_dict = OPTIONS_MANAGER.opera_script_file_name_dict
     for each_value in opera_script_file_name_dict.values():
         for each in each_value:
@@ -632,8 +619,7 @@ def get_update_info():
     head_info_list, component_info_dict, \
         full_img_list, incremental_img_list, \
         OPTIONS_MANAGER.target_package_version, \
-        OPTIONS_MANAGER.full_image_path_list, \
-        OPTIONS_MANAGER.two_step = \
+        OPTIONS_MANAGER.full_image_path_list = \
         parse_update_config(xml_file_path)
     if head_info_list is False or component_info_dict is False or \
             full_img_list is False or incremental_img_list is False:
