@@ -33,7 +33,6 @@ from build_pkcs7 import sign_ota_package
 operation_path = os.path.dirname(os.path.realpath(__file__))
 PRODUCT = 'hi3516'
 BUILD_TOOLS_FILE_NAME = 'build_tools.zip'
-UPDATE_BIN_FILE_NAME = "update.bin"
 UPDATE_EXE_FILE_NAME = "updater_binary"
 
 SCRIPT_KEY_LIST = ['prelude', 'verse', 'refrain', 'ending']
@@ -179,10 +178,8 @@ class OptionsManager:
 
         # Incremental processing parameters
         self.incremental_content_len_list = []
-        self.incremental_image_file_obj_dict = {}
-        self.incremental_block_file_obj_dict = {}
+        self.incremental_image_file_obj_list = []
         self.incremental_temp_file_obj_list = []
-        self.max_stash_size = 0
         self.src_image = None
         self.tgt_image = None
 
@@ -304,7 +301,7 @@ def parse_update_config(xml_path):
 
     if not OPTIONS_MANAGER.not_l2:
         expand_component(component_dict)
-    if isinstance(component_info, OrderedDict) or isinstance(component_info, dict):
+    if isinstance(component_info, OrderedDict):
         component_info = [component_info]
     if component_info is None:
         ret_params = [[], {}, [], [], '', [], False]
@@ -312,6 +309,7 @@ def parse_update_config(xml_path):
     for component in component_info:
         component_list = list(component.values())
         component_list.pop()
+        component_dict[component['@compAddr']] = component_list
 
         if component['@compAddr'] in (whole_list + difference_list):
             UPDATE_LOGGER.print_log("This component %s  repeats!" %
@@ -327,7 +325,6 @@ def parse_update_config(xml_path):
             tem_path = os.path.join(OPTIONS_MANAGER.target_package_dir,
                                     component.get("#text", None))
             full_image_path_list.append(tem_path)
-            component_dict[component['@compAddr']] = component_list
         elif component['@compType'] == '1':
             difference_list.append(component['@compAddr'])
             OPTIONS_MANAGER.incremental_img_name_list.\
@@ -471,6 +468,7 @@ def clear_options():
 
     # Incremental processing parameters
     OPTIONS_MANAGER.incremental_content_len_list = []
+    OPTIONS_MANAGER.incremental_image_file_obj_list = []
     OPTIONS_MANAGER.incremental_temp_file_obj_list = []
 
     # Script parameters
@@ -539,6 +537,12 @@ def clear_file_obj(err_clear):
         for each_incremental_temp_obj in incremental_temp_file_obj_list:
             if each_incremental_temp_obj is not None:
                 each_incremental_temp_obj.close()
+    incremental_image_file_obj_list = \
+        OPTIONS_MANAGER.incremental_image_file_obj_list
+    if len(incremental_image_file_obj_list) != 0:
+        for each_incremental_obj in incremental_image_file_obj_list:
+            if each_incremental_obj is not None:
+                each_incremental_obj.close()
     opera_script_file_name_dict = OPTIONS_MANAGER.opera_script_file_name_dict
     for each_value in opera_script_file_name_dict.values():
         for each in each_value:

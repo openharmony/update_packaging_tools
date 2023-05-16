@@ -28,7 +28,6 @@ from utils import FILE_MAP_ZERO_KEY
 from utils import FILE_MAP_NONZERO_KEY
 from utils import FILE_MAP_COPY_KEY
 from utils import MAX_BLOCKS_PER_GROUP
-from utils import UPDATE_BIN_FILE_NAME
 
 
 class FullUpdateImage:
@@ -73,11 +72,12 @@ class FullUpdateImage:
             full_image_file_obj_list.append(each_img)
             UPDATE_LOGGER.print_log(
                 "Image %s full processing completed" % img_name)
-        if not self.no_zip:
-            # No zip mode (no script command)
-            image_write_cmd = self.verse_script.full_image_update(UPDATE_BIN_FILE_NAME)
-            cmd = '%s_WRITE_FLAG%s' % (UPDATE_BIN_FILE_NAME, image_write_cmd)
-            self.verse_script.add_command(cmd=cmd)
+            if not self.no_zip:
+                # No zip mode (no script command)
+                image_write_cmd = \
+                    self.verse_script.image_write(each_name, img_name, each_img.name)
+                cmd = '%s_WRITE_FLAG%s' % (each_name, image_write_cmd)
+                self.verse_script.add_command(cmd=cmd)
 
         UPDATE_LOGGER.print_log(
             "All full image processing completed! image count: %d" %
