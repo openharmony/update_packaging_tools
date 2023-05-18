@@ -21,14 +21,14 @@ import json
 import os
 import shutil
 import tempfile
+import xmltodict
 import zipfile
 from collections import OrderedDict
+from build_pkcs7 import sign_ota_package
 from copy import copy
 from ctypes import cdll
 from cryptography.hazmat.primitives import hashes
 from log_exception import UPDATE_LOGGER
-import xmltodict
-from build_pkcs7 import sign_ota_package
 
 operation_path = os.path.dirname(os.path.realpath(__file__))
 PRODUCT = 'hi3516'
@@ -76,7 +76,15 @@ PER_BLOCK_SIZE = 4096
 VERSE_SCRIPT_EVENT = 0
 INC_IMAGE_EVENT = 1
 SIGN_PACKAGE_EVENT = 2
-GENERATE_SIGNED_DATA_EVENT = 6 # sign build tools files to get hash_signed_data
+CHECK_BINARY_EVENT = 3
+CONFIG_EVENT = 4
+EXTEND_PATH_EVENT = 5
+ZIP_EVENT = 6
+GENERATE_SIGNED_DATA_EVENT = 7 # sign build tools files to get hash_signed_data
+PARTITION_CHANGE_EVENT = 8
+
+# Image file can not support update.
+FORBIDEN_UPDATE_IMAGE_LIST = ["ptable"]
 
 # 1000000: max number of function recursion depth
 MAXIMUM_RECURSION_DEPTH = 1000000
@@ -310,6 +318,8 @@ def parse_update_config(xml_path):
         ret_params = [[], {}, [], [], '', [], False]
         return ret_params
     for component in component_info:
+        if component['@compAddr'] == 'userdata' and not OPTIONS_MANAGER.sd_card:
+            continue
         component_list = list(component.values())
         component_list.pop()
 
@@ -402,17 +412,26 @@ def parse_partition_file_xml(xml_path):
     return file_obj, partitions_list, partitions_file_path_list
 
 
+def get_extend_path_list():
+    get_config_list = OPTIONS_MANAGER.init.invoke_event(CONFIG_EVENT)
+    if get_config_list:
+        return get_config_list()
+    else:
+        return EXTEND_COMPONENT_LIST
+
+
 def expand_component(component_dict):
     """
     Append components such as VERSION.mbn and board list.
     :param component_dict: component information dict
     :return:
     """
+    extend_path_list = get_extend_path_list()
     if OPTIONS_MANAGER.partition_file is not None:
         extend_component_list = \
-            EXTEND_COMPONENT_LIST + EXTEND_OPTIONAL_COMPONENT_LIST
+            extend_path_list + EXTEND_OPTIONAL_COMPONENT_LIST
     else:
-        extend_component_list = EXTEND_COMPONENT_LIST
+        extend_component_list = extend_path_list
     for each in extend_component_list:
         tmp_info_list = copy(COMPONENT_INFO_INNIT)
         tmp_info_list[0] = each

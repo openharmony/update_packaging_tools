@@ -120,7 +120,7 @@ class UnpackPackage(object):
     def create_image_file(self, package_file):
         component_name, component_type, component_size = \
             self.parse_component(package_file)
-        if not component_name and not component_type and not component_size:
+        if component_name is None and component_type is None and component_size is None:
             UPDATE_LOGGER.print_log(
                 "get component_info failed!", UPDATE_LOGGER.ERROR_LOG)
             return False

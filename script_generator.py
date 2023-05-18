@@ -236,6 +236,10 @@ class VerseScript(Script):
         cmd = 'update_from_bin("%s");\n' % update_file_name
         return cmd
 
+    def pkg_extract(self, pkg_file_name, dest_path):
+        cmd = 'pkg_extract("%s", "%s");\n' % (pkg_file_name, dest_path)
+        return cmd
+
 
 class RefrainScript(Script):
     def __init__(self):
