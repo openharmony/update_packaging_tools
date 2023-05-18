@@ -36,12 +36,15 @@ from utils import EXTEND_OPTIONAL_COMPONENT_LIST
 from utils import COMPONENT_INFO_INNIT
 from utils import UPDATE_EXE_FILE_NAME
 from utils import TOTAL_SCRIPT_FILE_NAME
-from utils import EXTEND_COMPONENT_LIST
+from utils import EXTEND_PATH_LIST
 from utils import LINUX_HASH_ALGORITHM_DICT
 from utils import UPDATE_BIN_FILE_NAME
 from utils import BUILD_TOOLS_FILE_NAME
 from utils import SIGN_PACKAGE_EVENT
+from utils import CHECK_BINARY_EVENT
+from utils import ZIP_EVENT
 from utils import GENERATE_SIGNED_DATA_EVENT
+from utils import get_extend_path_list
 from create_update_package import CreatePackage
 from create_update_package import SIGN_ALGO_RSA
 from create_update_package import SIGN_ALGO_PSS
@@ -161,20 +164,24 @@ def get_component_list(all_image_file_obj_list, component_dict):
     """
     pkg_components = PkgComponent * len(component_dict)
     component_list = pkg_components()
+    extend_list = get_extend_path_list()
     if not OPTIONS_MANAGER.not_l2:
         if OPTIONS_MANAGER.partition_file_obj is not None:
             extend_component_list = \
-                EXTEND_COMPONENT_LIST + EXTEND_OPTIONAL_COMPONENT_LIST
+                extend_list + EXTEND_OPTIONAL_COMPONENT_LIST
             extend_path_list = [OPTIONS_MANAGER.version_mbn_file_path,
                                 OPTIONS_MANAGER.board_list_file_path,
                                 OPTIONS_MANAGER.partition_file_obj.name]
         else:
-            extend_component_list = EXTEND_COMPONENT_LIST
+            extend_component_list = extend_list
             extend_path_list = [OPTIONS_MANAGER.version_mbn_file_path,
                                 OPTIONS_MANAGER.board_list_file_path]
     else:
         extend_component_list = []
         extend_path_list = []
+        get_path_list = OPTIONS_MANAGER.init.invoke_event(EXTEND_PATH_EVENT)
+        if get_path_list:
+            extend_path_list = get_path_list()
     idx = 0
     for key, component in component_dict.items():
         if idx < len(extend_component_list):
@@ -344,11 +351,6 @@ def create_build_tools_zip():
     register_script_file_obj = OPTIONS_MANAGER.register_script_file_obj
     update_exe_path = os.path.join(OPTIONS_MANAGER.target_package_dir,
                                    UPDATE_EXE_FILE_NAME)
-    if not os.path.exists(update_exe_path):
-        UPDATE_LOGGER.print_log(
-            "updater_binary file does not exist!path: %s" % update_exe_path,
-            log_type=UPDATE_LOGGER.ERROR_LOG)
-        return False
 
     file_obj = tempfile.NamedTemporaryFile(
         dir=OPTIONS_MANAGER.update_package, prefix="build_tools-")
@@ -360,10 +362,19 @@ def create_build_tools_zip():
     for key, value in opera_script_dict.items():
         zip_file.write(key, value)
         files_to_sign += [(key, name_format_str.format(value))]
-
-    # add update_binary to build_tools.zip
-    zip_file.write(update_exe_path, UPDATE_EXE_FILE_NAME)
-    files_to_sign += [(update_exe_path, name_format_str.format(UPDATE_EXE_FILE_NAME))]
+    binary_no_check = OPTIONS_MANAGER.init.invoke_event(CHECK_BINARY_EVENT)
+    binary_no_check_ret = False
+    if binary_no_check:
+        binary_no_check_ret = binary_no_check()
+    if binary_no_check_ret is False:
+        if not os.path.exists(update_exe_path):
+        UPDATE_LOGGER.print_log(
+            "updater_binary file does not exist!path: %s" % update_exe_path,
+            log_type=UPDATE_LOGGER.ERROR_LOG)
+        return False
+        # add update_binary to build_tools.zip
+        zip_file.write(update_exe_path, UPDATE_EXE_FILE_NAME)
+        files_to_sign += [(update_exe_path, name_format_str.format(UPDATE_EXE_FILE_NAME))]
 
     # add loadScript to build_tools.zip
     zip_file.write(total_script_file_obj.name, TOTAL_SCRIPT_FILE_NAME)
@@ -375,6 +386,37 @@ def create_build_tools_zip():
     if create_hsd_for_build_tools(zip_file, files_to_sign) is False:
         return False
     return file_obj
+
+
+def do_sign_package(update_package, update_file_name):
+    signed_package = os.path.join(
+            update_package, "%s.zip" % update_file_name)
+        OPTIONS_MANAGER.signed_package = signed_package
+        if os.path.exists(signed_package):
+            os.remove(signed_package)
+
+        sign_ota_package = \
+            OPTIONS_MANAGER.init.invoke_event(SIGN_PACKAGE_EVENT)
+        if sign_ota_package:
+            return sign_ota_package()
+        else:
+            return sign_package()
+
+
+def get_update_file_name():
+    if OPTIONS_MANAGER.sd_card :
+        package_type = "sd"
+    elif OPTIONS_MANAGER.source_package :
+        package_type = "diff"
+    else :
+        package_type = "full"
+    if OPTIONS_MANAGER.not_l2:
+        update_file_name = ''.join(
+            ["updater_", OPTIONS_MANAGER.target_package_version.replace(" ", "_")])
+    else :
+        update_file_name = ''.join(
+            ["updater_", package_type])
+    return update_file_name
 
 
 def do_zip_update_package():
@@ -441,18 +483,7 @@ def build_update_package(no_zip, update_package, prelude_script,
     else:
         return False
 
-    if OPTIONS_MANAGER.sd_card :
-        package_type = "sd"
-    elif OPTIONS_MANAGER.source_package :
-        package_type = "diff"
-    else :
-        package_type = "full"
-    if OPTIONS_MANAGER.not_l2:
-        update_file_name = ''.join(
-            ["updater_", OPTIONS_MANAGER.target_package_version.replace(" ", "_")])
-    else :
-        update_file_name = ''.join(
-            ["updater_", package_type])
+    update_file_name = get_update_file_name()
             
     if not no_zip:
         update_package_path = os.path.join(
@@ -478,12 +509,7 @@ def build_update_package(no_zip, update_package, prelude_script,
         if os.path.exists(signed_package):
             os.remove(signed_package)
 
-        sign_ota_package = \
-            OPTIONS_MANAGER.init.invoke_event(SIGN_PACKAGE_EVENT)
-        if sign_ota_package:
-            sign_result = sign_ota_package()
-        else:
-            sign_result = sign_package()
+        sign_result = do_sign_package(update_package, update_file_name)
 
         if not sign_result:
             UPDATE_LOGGER.print_log("Sign ota package fail", UPDATE_LOGGER.ERROR_LOG)
