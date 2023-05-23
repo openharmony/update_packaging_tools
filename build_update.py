@@ -80,6 +80,7 @@ from utils import MAXIMUM_RECURSION_DEPTH
 from utils import VERSE_SCRIPT_EVENT
 from utils import INC_IMAGE_EVENT
 from utils import DIFF_EXE_PATH
+from utils import DECOUPLED_EVENT
 from utils import get_update_config_softversion
 from vendor_script import create_vendor_script_class
 
@@ -353,10 +354,12 @@ def check_incremental_args(no_zip, partition_file, source_package,
     get_update_config_softversion(OPTIONS_MANAGER.source_package_dir, package_dict.get('head', {}))
     head_dict = package_dict.get('head', {}).get('info')
     OPTIONS_MANAGER.source_package_version = head_dict.get("@softVersion")
-    if check_package_version(OPTIONS_MANAGER.target_package_version,
-                             OPTIONS_MANAGER.source_package_version) is False:
-        clear_resource(err_clear=True)
-        return False
+    no_need_version_check_res = OPTIONS_MANAGER.init.invoke_event(DECOUPLED_EVENT)
+    if no_need_version_check_res is False:
+        if check_package_version(OPTIONS_MANAGER.target_package_version,
+                                OPTIONS_MANAGER.source_package_version) is False:
+            clear_resource(err_clear=True)
+            return False
     return True
 
 

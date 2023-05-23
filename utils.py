@@ -82,6 +82,7 @@ EXTEND_PATH_EVENT = 5
 ZIP_EVENT = 6
 GENERATE_SIGNED_DATA_EVENT = 7 # sign build tools files to get hash_signed_data
 PARTITION_CHANGE_EVENT = 8
+DECOUPLED_EVENT = 9
 
 # Image file can not support update.
 FORBIDEN_UPDATE_IMAGE_LIST = ["ptable"]
