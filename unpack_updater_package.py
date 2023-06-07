@@ -22,18 +22,26 @@ import time
 from create_update_package import UPGRADE_FILE_HEADER_LEN
 from create_update_package import UPGRADE_COMPINFO_SIZE
 from create_update_package import UPGRADE_COMPINFO_SIZE_L2
-from create_update_package import COMPONEBT_ADDR_SIZE
-from create_update_package import COMPONEBT_ADDR_SIZE_L2
+from create_update_package import COMPONENT_ADDR_SIZE
+from create_update_package import COMPONENT_ADDR_SIZE_L2
 from create_update_package import UPGRADE_RESERVE_LEN
 from create_update_package import UPGRADE_SIGNATURE_LEN
+
+from create_hashdata import HASH_TYPE_SIZE
+from create_hashdata import HASH_LENGTH_SIZE
+from create_hashdata import HASH_TLV_SIZE
+from create_hashdata import UPGRADE_HASHINFO_SIZE
+from create_hashdata import CreateHash
+from create_hashdata import HashType
+
 from log_exception import UPDATE_LOGGER
 from utils import OPTIONS_MANAGER
 
 COMPINFO_LEN_OFFSET = 178
 COMPINFO_LEN_SIZE = 2
-COMPONEBT_ADDR_OFFSET = UPGRADE_FILE_HEADER_LEN
-COMPONENT_TYPE_OFFSET = COMPONEBT_ADDR_OFFSET + COMPONEBT_ADDR_SIZE + 4
-COMPONENT_TYPE_OFFSET_L2 = COMPONEBT_ADDR_OFFSET + COMPONEBT_ADDR_SIZE_L2 + 4
+COMPONENT_ADDR_OFFSET = UPGRADE_FILE_HEADER_LEN
+COMPONENT_TYPE_OFFSET = COMPONENT_ADDR_OFFSET + COMPONENT_ADDR_SIZE + 4
+COMPONENT_TYPE_OFFSET_L2 = COMPONENT_ADDR_OFFSET + COMPONENT_ADDR_SIZE_L2 + 4
 COMPONENT_TYPE_SIZE = 1
 COMPONENT_SIZE_OFFSET = 11
 COMPONENT_SIZE_SIZE = 4
@@ -46,7 +54,7 @@ B: unsigned char
 s: char[]
 """
 COMPINFO_LEN_FMT = "H"
-COMPONEBT_TYPE_FMT = "B"
+COMPONENT_TYPE_FMT = "B"
 COMPONENT_SIZE_FMT = "I"
 
 
@@ -63,18 +71,18 @@ class UnpackPackage(object):
         if OPTIONS_MANAGER.not_l2:
             self.compinfo_size = UPGRADE_COMPINFO_SIZE
             self.type_offset = COMPONENT_TYPE_OFFSET
-            self.addr_size = COMPONEBT_ADDR_SIZE
+            self.addr_size = COMPONENT_ADDR_SIZE
         else:
             self.compinfo_size = UPGRADE_COMPINFO_SIZE_L2
             self.type_offset = COMPONENT_TYPE_OFFSET_L2
-            self.addr_size = COMPONEBT_ADDR_SIZE_L2
+            self.addr_size = COMPONENT_ADDR_SIZE_L2
 
-        self.addr_offset = COMPONEBT_ADDR_OFFSET
+        self.addr_offset = COMPONENT_ADDR_OFFSET
         self.size_offset = self.type_offset + COMPONENT_SIZE_OFFSET
 
     def check_args(self):
         if not os.access(OPTIONS_MANAGER.unpack_package_path, os.R_OK) and \
-            notos.path.exists(self.save_path):
+            not os.path.exists(self.save_path):
                 UPDATE_LOGGER.print_log(
                     "Access unpack_package_path fail! path: %s" % \
                     OPTIONS_MANAGER.unpack_package_path, UPDATE_LOGGER.ERROR_LOG)
@@ -105,7 +113,7 @@ class UnpackPackage(object):
             
             package_file.seek(self.type_offset)
             component_type_buffer = package_file.read(COMPONENT_TYPE_SIZE)
-            component_type = struct.unpack(COMPONEBT_TYPE_FMT, component_type_buffer)
+            component_type = struct.unpack(COMPONENT_TYPE_FMT, component_type_buffer)
 
             package_file.seek(self.size_offset)
             component_size_buffer = package_file.read(COMPONENT_SIZE_SIZE)
@@ -175,6 +183,7 @@ class UnpackPackage(object):
                 UPDATE_LOGGER.print_log(
                     "parse package file failed!", UPDATE_LOGGER.ERROR_LOG)
                 return False
+
             for image_id in range(0, self.count):
                 UPDATE_LOGGER.print_log("Start to parse component_%d" % image_id)
                 if not self.create_image_file(package_file):

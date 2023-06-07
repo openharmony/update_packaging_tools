@@ -141,9 +141,6 @@ def create_update_bin():
         UPDATE_LOGGER.print_log(
             "Create update package .bin failed!", UPDATE_LOGGER.ERROR_LOG)
         return False
-    if not package.sign(sign_algo):
-        UPDATE_LOGGER.print_log(".bin package signing failed", UPDATE_LOGGER.ERROR_LOG)
-        return False
 
     UPDATE_LOGGER.print_log(
         "Create update package .bin complete! path: %s" % update_bin_obj.name)
