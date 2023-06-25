@@ -169,7 +169,7 @@ class PatchProcess:
 
             diff_offset += len(patch_value)
             total_blocks_count += tgt_size
-        return max_stashed_blocks,  stashed_blocks, total_blocks_count, diff_offset
+        return max_stashed_blocks, stashed_blocks, total_blocks_count, diff_offset
 
     def after_for_process(self, max_stashed_blocks, total_blocks_count,
                           transfer_content, transfer_list_file_obj):
