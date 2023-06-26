@@ -84,7 +84,7 @@ class PatchProcess:
                                         tgt_size, total_blocks_count,
                                         transfer_content)
             elif each_action.type_str == ActionType.DIFFERENT:
-                max_stashed_blocks, total_blocks_count, diff_offset = \
+                max_stashed_blocks, stashed_blocks, total_blocks_count, diff_offset = \
                     self.apply_diff_style(
                         diff_offset, each_action, max_stashed_blocks,
                         patch_dat_file_obj, src_str, stashed_blocks, tgt_size,
@@ -147,7 +147,7 @@ class PatchProcess:
                 each_action.src_name,
                 str(each_action.src_block_set)))
 
-            max_stashed_blocks, total_blocks_count = \
+            max_stashed_blocks, stashed_blocks, total_blocks_count = \
                 self.add_move_command(
                     each_action, max_stashed_blocks, src_str,
                     stashed_blocks, tgt_size, total_blocks_count,
@@ -158,10 +158,10 @@ class PatchProcess:
 
             if each_action.src_block_set.is_overlaps(
                     each_action.tgt_block_set):
-                temp_stash_usage = \
+                stashed_blocks = \
                     stashed_blocks + each_action.src_block_set.size()
-                if temp_stash_usage > max_stashed_blocks:
-                    max_stashed_blocks = temp_stash_usage
+                if stashed_blocks > max_stashed_blocks:
+                    max_stashed_blocks = stashed_blocks
 
             self.add_diff_command(diff_offset, do_pkg_diff,
                                   each_action, patch_value, src_str,
@@ -169,7 +169,7 @@ class PatchProcess:
 
             diff_offset += len(patch_value)
             total_blocks_count += tgt_size
-        return max_stashed_blocks, total_blocks_count, diff_offset
+        return max_stashed_blocks, stashed_blocks, total_blocks_count, diff_offset
 
     def after_for_process(self, max_stashed_blocks, total_blocks_count,
                           transfer_content, transfer_list_file_obj):
@@ -200,7 +200,7 @@ class PatchProcess:
         transfer_content = self.get_transfer_content(
             max_stashed_blocks, total_blocks_count, transfer_content)
         transfer_list_file_obj.write(transfer_content.encode())
-        OPTIONS_MANAGER.max_stash_size += max_stashed_blocks * 4096
+        OPTIONS_MANAGER.max_stash_size = max(max_stashed_blocks * 4096, OPTIONS_MANAGER.max_stash_size)
 
     @staticmethod
     def get_transfer_content(max_stashed_blocks, total_blocks_count,
@@ -284,10 +284,10 @@ class PatchProcess:
         tgt_block_set = each_action.tgt_block_set
         if src_block_set != tgt_block_set:
             if src_block_set.is_overlaps(tgt_block_set):
-                temp_stash_usage = stashed_blocks + \
+                stashed_blocks = stashed_blocks + \
                                    src_block_set.size()
-                if temp_stash_usage > max_stashed_blocks:
-                    max_stashed_blocks = temp_stash_usage
+                if stashed_blocks > max_stashed_blocks:
+                    max_stashed_blocks = stashed_blocks
 
             self.touched_src_ranges = \
                 self.touched_src_ranges.get_union_with_other(src_block_set)
@@ -300,7 +300,7 @@ class PatchProcess:
                        tgt_string=tgt_block_set.to_string_raw(),
                        src_str=src_str))
             total_blocks_count += tgt_size
-        return max_stashed_blocks, total_blocks_count
+        return max_stashed_blocks, stashed_blocks, total_blocks_count
 
     def add_free_command(self, each_action, stashes):
         """
