@@ -80,6 +80,7 @@ from utils import MAXIMUM_RECURSION_DEPTH
 from utils import VERSE_SCRIPT_EVENT
 from utils import INC_IMAGE_EVENT
 from utils import DIFF_EXE_PATH
+from utils import PARTITION_CHANGE_EVENT
 from utils import DECOUPLED_EVENT
 from utils import get_update_config_softversion
 from vendor_script import create_vendor_script_class
@@ -307,38 +308,33 @@ def check_incremental_args(no_zip, partition_file, source_package,
     :return:
     """
     if "boot" in incremental_img_list:
-        UPDATE_LOGGER.print_log(
-            "boot cannot be incrementally processed!",
-            UPDATE_LOGGER.ERROR_LOG)
+        UPDATE_LOGGER.print_log("boot cannot be incrementally processed!", UPDATE_LOGGER.ERROR_LOG)
         clear_resource(err_clear=True)
         return False
     if source_package is None:
-        UPDATE_LOGGER.print_log(
-            "The source package is missing, "
-            "cannot be incrementally processed!",
-            UPDATE_LOGGER.ERROR_LOG)
+        UPDATE_LOGGER.print_log("The source package is missing, "
+            "cannot be incrementally processed!", UPDATE_LOGGER.ERROR_LOG)
         clear_resource(err_clear=True)
         return False
     if no_zip:
-        UPDATE_LOGGER.print_log(
-            "No ZIP mode, cannot be incrementally processed!",
-            UPDATE_LOGGER.ERROR_LOG)
+        UPDATE_LOGGER.print_log("No ZIP mode, cannot be incrementally processed!", UPDATE_LOGGER.ERROR_LOG)
         clear_resource(err_clear=True)
         return False
     if partition_file is not None:
-        UPDATE_LOGGER.print_log(
-            "Partition file is not None, "
-            "cannot be incrementally processed!",
-            UPDATE_LOGGER.ERROR_LOG)
+        UPDATE_LOGGER.print_log("Partition file is not None, "
+            "cannot be incrementally processed!", UPDATE_LOGGER.ERROR_LOG)
         clear_resource(err_clear=True)
         return False
 
     if not get_source_package_path(source_package):
         return False
+    partition_change = OPTIONS_MANAGER.init.invoke_event(PARTITION_CHANGE_EVENT)
+    if callable(partition_change) and partition_change() is False:
+        return False
+    UPDATE_LOGGER.print_log("Partition interception check finish.", UPDATE_LOGGER.ERROR_LOG)
     xml_path = ''
     if OPTIONS_MANAGER.source_package_dir is not False:
-        xml_path = os.path.join(OPTIONS_MANAGER.source_package_dir,
-                                UPDATER_CONFIG, XML_FILE_PATH)
+        xml_path = os.path.join(OPTIONS_MANAGER.source_package_dir, UPDATER_CONFIG, XML_FILE_PATH)
     if OPTIONS_MANAGER.source_package_dir is False:
         OPTIONS_MANAGER.source_package_temp_obj = None
         OPTIONS_MANAGER.source_package_dir = None
@@ -349,6 +345,7 @@ def check_incremental_args(no_zip, partition_file, source_package,
         UPDATE_LOGGER.print_log("XML file does not exist! xml path: %s" %
                                 xml_path, UPDATE_LOGGER.ERROR_LOG)
         return False
+    
     xml_content_dict = xmltodict.parse(xml_str, encoding='utf-8')
     package_dict = xml_content_dict.get('package', {})
     get_update_config_softversion(OPTIONS_MANAGER.source_package_dir, package_dict.get('head', {}))
@@ -574,12 +571,32 @@ def increment_image_diff_processing(
                 '-p', patch_file_obj.name, '-l', '4096'])
     sub_p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT)
-    output, _ = sub_p.communicate()
+    try:
+        output, _ = sub_p.communicate(timeout=1800)
+    except subprocess.TimeoutExpired:
+        sub_p.kill()
+
     sub_p.wait()
     if sub_p.returncode != 0:
         raise ValueError(output)
     return write_image_patch_script(partition, src_image_path, tgt_image_path,
         script_check_cmd_list, script_write_cmd_list, verse_script)
+
+
+def add_incremental_command(verse_script, script_check_cmd_list, script_write_cmd_list):
+    """
+    add command for increment_image_progressing to verse_script
+    :param verse_script: verse script
+    :param script_check_cmd_list: verse_script check command list
+    :param script_write_cmd_list: verse_script write command list
+    :return:
+    """
+    verse_script.add_command("\n# ---- start incremental check here ----\n")
+    for each_check_cmd in script_check_cmd_list:
+        verse_script.add_command(each_check_cmd)
+    verse_script.add_command("\n# ---- start incremental write here ----\n")
+    for each_write_cmd in script_write_cmd_list:
+        verse_script.add_command(each_write_cmd)
 
 
 def increment_image_processing(
@@ -596,36 +613,20 @@ def increment_image_processing(
     script_check_cmd_list = []
     script_write_cmd_list = []
     patch_process = None
-    block_diff = 0
     for each_img_name in OPTIONS_MANAGER.incremental_img_name_list:
         each_img = each_img_name[:-4]
-        each_src_image_path = \
-            os.path.join(source_package_dir,
-                         '%s.img' % each_img)
-        each_src_map_path = \
-            os.path.join(source_package_dir,
-                         '%s.map' % each_img)
-        each_tgt_image_path = \
-            os.path.join(target_package_dir,
-                         '%s.img' % each_img)
-        each_tgt_map_path = \
-            os.path.join(target_package_dir,
-                         '%s.map' % each_img)
+        each_src_image_path = os.path.join(source_package_dir, '%s.img' % each_img)
+        each_src_map_path = os.path.join(source_package_dir, '%s.map' % each_img)
+        each_tgt_image_path = os.path.join(target_package_dir, '%s.img' % each_img)
+        each_tgt_map_path = os.path.join(target_package_dir, '%s.map' % each_img)
 
         check_make_map_path(each_img)
 
         if filecmp.cmp(each_src_image_path, each_tgt_image_path):
             UPDATE_LOGGER.print_log(
-                "Source Image is the same as Target Image!"
-                "src image path: %s, tgt image path: %s" %
-                (each_src_image_path, each_tgt_image_path),
-                UPDATE_LOGGER.INFO_LOG)
+                "Source Image is the same as Target Image! src image path: %s, tgt image path: %s"
+                % (each_src_image_path, each_tgt_image_path), UPDATE_LOGGER.INFO_LOG)
             OPTIONS_MANAGER.incremental_img_list.remove(each_img)
-            first_block_check_cmd = verse_script.first_block_check(each_img)
-            abort_cmd = verse_script.abort(each_img)
-            cmd = 'if ({first_block_check_cmd} != 0)' '{{\n    {abort_cmd}}}\n'.format(
-            first_block_check_cmd=first_block_check_cmd, abort_cmd=abort_cmd)
-            script_check_cmd_list.append(cmd)
             continue
 
         src_generate_map = True
@@ -633,16 +634,10 @@ def increment_image_processing(
         if not os.path.exists(each_src_map_path):
             src_generate_map = generate_image_map_file(each_src_image_path,
                                     each_src_map_path, each_img)
-            if not src_generate_map:
-                UPDATE_LOGGER.print_log("The source %s.img file"
-                        "generate map file failed. " % each_img)
 
         if not os.path.exists(each_tgt_map_path):
             tgt_generate_map = generate_image_map_file(each_tgt_image_path,
                                     each_tgt_map_path, each_img)
-            if not tgt_generate_map:
-                UPDATE_LOGGER.print_log("The target %s.img file"
-                        "generate map file failed. " % each_img)
 
         if not src_generate_map or not tgt_generate_map:
             if increment_image_diff_processing(each_img, each_src_image_path, each_tgt_image_path,
@@ -652,11 +647,8 @@ def increment_image_processing(
             clear_resource(err_clear=True)
             return False
 
-        block_diff += 1
-        src_image_class = \
-            IncUpdateImage(each_src_image_path, each_src_map_path)
-        tgt_image_class = \
-            IncUpdateImage(each_tgt_image_path, each_tgt_map_path)
+        src_image_class = IncUpdateImage(each_src_image_path, each_src_map_path)
+        tgt_image_class = IncUpdateImage(each_tgt_image_path, each_tgt_map_path)
         OPTIONS_MANAGER.src_image = src_image_class
         OPTIONS_MANAGER.tgt_image = tgt_image_class
 
@@ -664,36 +656,23 @@ def increment_image_processing(
         if inc_image:
             src_image_class, tgt_image_class = inc_image()
 
-        transfers_manager = TransfersManager(
-            each_img, tgt_image_class, src_image_class)
+        transfers_manager = TransfersManager(each_img, tgt_image_class, src_image_class)
         transfers_manager.find_process_needs()
         actions_list = transfers_manager.get_action_list()
 
-        graph_process = GigraphProcess(actions_list, src_image_class,
-                                       tgt_image_class)
+        graph_process = GigraphProcess(actions_list, src_image_class, tgt_image_class)
         actions_list = graph_process.actions_list
         patch_process = \
-            patch_package_process.PatchProcess(
-                each_img, tgt_image_class, src_image_class, actions_list)
+            patch_package_process.PatchProcess(each_img, tgt_image_class, src_image_class, actions_list)
         patch_process.patch_process()
-        patch_process.write_script(each_img, script_check_cmd_list,
-                                   script_write_cmd_list, verse_script)
+        patch_process.write_script(each_img, script_check_cmd_list, script_write_cmd_list, verse_script)
         OPTIONS_MANAGER.incremental_block_file_obj_dict[each_img] = patch_process.package_patch_zip
 
         if not check_patch_file(patch_process):
-            UPDATE_LOGGER.print_log(
-                'Verify the incremental result failed!',
-                UPDATE_LOGGER.ERROR_LOG)
+            UPDATE_LOGGER.print_log('Verify the incremental result failed!', UPDATE_LOGGER.ERROR_LOG)
             raise RuntimeError
 
-    verse_script.add_command(
-        "\n# ---- start incremental check here ----\n")
-    for each_check_cmd in script_check_cmd_list:
-        verse_script.add_command(each_check_cmd)
-    verse_script.add_command(
-        "\n# ---- start incremental write here ----\n")
-    for each_write_cmd in script_write_cmd_list:
-        verse_script.add_command(each_write_cmd)
+    add_incremental_command(verse_script, script_check_cmd_list, script_write_cmd_list)
     return True
 
 
@@ -794,6 +773,18 @@ def check_args(private_key, source_package, target_package, update_package):
     return True
 
 
+def unpack_package_processing():
+    if OPTIONS_MANAGER.unpack_package_path:
+        package = UnpackPackage()
+        if not package.unpack_package():
+            UPDATE_LOGGER.print_log("Unpack update package.bin failed!", UPDATE_LOGGER.ERROR_LOG)
+            clear_resource(err_clear=True)
+            return
+        UPDATE_LOGGER.print_log("Unpack update package.bin success!")
+        clear_resource()
+        return
+
+
 create_entrance_args()
 
 
@@ -806,34 +797,18 @@ def main():
     OPTIONS_MANAGER.product = PRODUCT
 
     source_package, target_package, update_package, no_zip, not_l2, \
-        partition_file, signing_algorithm, hash_algorithm, private_key = \
-        get_args()
+        partition_file, signing_algorithm, hash_algorithm, private_key = get_args()
     if not_l2:
         no_zip = True
     
     # Unpack updater package
-    if OPTIONS_MANAGER.unpack_package_path:
-        package = UnpackPackage()
-        if not package.unpack_package():
-            UPDATE_LOGGER.print_log(
-                "Unpack update package .bin failed!", UPDATE_LOGGER.ERROR_LOG)
-            clear_resource(err_clear=True)
-            return
-        UPDATE_LOGGER.print_log("Unpack update package .bin success!")
-        clear_resource(err_clear=True)
-        return
+    unpack_package_processing()
 
     if OPTIONS_MANAGER.sd_card:
-        if source_package is not None or \
-                OPTIONS_MANAGER.xml_path is not None or \
-                partition_file is not None:
-            UPDATE_LOGGER.print_log(
-                "SD Card updater, "
-                "the -S/-xp/-pf parameter is not required!",
-                UPDATE_LOGGER.ERROR_LOG)
+        if source_package is not None or OPTIONS_MANAGER.xml_path is not None or partition_file is not None:
+            UPDATE_LOGGER.print_log("SDCard updater:-S/-xp/-pf parameter is not required!", UPDATE_LOGGER.ERROR_LOG)
             raise RuntimeError
-    if check_args(private_key, source_package,
-                  target_package, update_package) is False:
+    if check_args(private_key, source_package, target_package, update_package) is False:
         clear_resource(err_clear=True)
         return
 
@@ -843,8 +818,7 @@ def main():
             return
 
     # Create a Script object.
-    prelude_script, verse_script, refrain_script, ending_script = \
-        get_script_obj()
+    prelude_script, verse_script, refrain_script, ending_script = get_script_obj()
 
     # Create partition.
     if partition_file is not None:
@@ -852,8 +826,7 @@ def main():
         updater_partitions_cmd = verse_script.updater_partitions()
         verse_script.add_command(updater_partitions_cmd)
 
-        partition_file_obj, partitions_list, partitions_file_path_list = \
-            parse_partition_file_xml(partition_file)
+        partition_file_obj, partitions_list, partitions_file_path_list = parse_partition_file_xml(partition_file)
         if partition_file_obj is False:
             clear_resource(err_clear=True)
             return False
@@ -861,35 +834,26 @@ def main():
         OPTIONS_MANAGER.full_img_list = partitions_list
         OPTIONS_MANAGER.full_image_path_list = partitions_file_path_list
 
-    if incremental_processing(
-            no_zip, partition_file, source_package, verse_script) is False:
+    if incremental_processing(no_zip, partition_file, source_package, verse_script) is False:
         clear_resource(err_clear=True)
         return
 
     # Full processing
     if len(OPTIONS_MANAGER.full_img_list) != 0:
         verse_script.add_command("\n# ---- full image ----\n")
-        full_update_image = \
-            FullUpdateImage(OPTIONS_MANAGER.target_package_dir,
-                            OPTIONS_MANAGER.full_img_list,
-                            OPTIONS_MANAGER.full_img_name_list,
-                            verse_script, OPTIONS_MANAGER.full_image_path_list,
-                            no_zip=OPTIONS_MANAGER.no_zip)
-        full_image_content_len_list, full_image_file_obj_list = \
-            full_update_image.update_full_image()
-        if full_image_content_len_list is False or \
-                full_image_file_obj_list is False:
+        full_update_image = FullUpdateImage(OPTIONS_MANAGER.target_package_dir,
+                            OPTIONS_MANAGER.full_img_list, OPTIONS_MANAGER.full_img_name_list, verse_script,
+                            OPTIONS_MANAGER.full_image_path_list, no_zip=OPTIONS_MANAGER.no_zip)
+        full_image_content_len_list, full_image_file_obj_list = full_update_image.update_full_image()
+        if full_image_content_len_list is False or full_image_file_obj_list is False:
             clear_resource(err_clear=True)
             return
-        OPTIONS_MANAGER.full_image_content_len_list, \
-            OPTIONS_MANAGER.full_image_file_obj_list = \
+        OPTIONS_MANAGER.full_image_content_len_list, OPTIONS_MANAGER.full_image_file_obj_list = \
             full_image_content_len_list, full_image_file_obj_list
 
     # Generate the update package.
-    build_re = build_update_package(no_zip, update_package,
-                                    prelude_script, verse_script,
-                                    refrain_script, ending_script)
-    if build_re is False:
+    if build_update_package(
+        no_zip, update_package, prelude_script, verse_script, refrain_script, ending_script) is False:
         clear_resource(err_clear=True)
         return
     # Clear resources.
