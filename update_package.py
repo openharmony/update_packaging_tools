@@ -411,7 +411,7 @@ def do_zip_update_package():
                                'w', zipfile.ZIP_DEFLATED, allowZip64=True)
     # add files to update package
     do_add_files = OPTIONS_MANAGER.init.invoke_event(ZIP_EVENT)
-    if callable (do_add_files) and not do_add_files(zip_file):
+    if callable(do_add_files) and do_add_files(zip_file) is False:
         UPDATE_LOGGER.print_log("add files fail", UPDATE_LOGGER.ERROR_LOG)
         zip_file.close()
         return False
