@@ -21,11 +21,11 @@ import json
 import os
 import shutil
 import tempfile
+from collections import OrderedDict
 import xmltodict
 import zipfile
 
 from build_pkcs7 import sign_ota_package
-from collections import OrderedDict
 from copy import copy
 from ctypes import cdll
 from cryptography.hazmat.primitives import hashes
