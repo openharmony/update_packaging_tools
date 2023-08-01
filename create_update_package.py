@@ -23,7 +23,7 @@ import subprocess
 from log_exception import UPDATE_LOGGER
 from utils import OPTIONS_MANAGER
 from create_hashdata import HashType
-from create_hashdata import Create_Hash
+from create_hashdata import CreateHash
 from create_hashdata import HASH_BLOCK_SIZE
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
@@ -276,32 +276,32 @@ class CreatePackage(object):
             return True
 
     def sign_header(self, sign_algo, hash_check_data, package_file):
-        #calculate hash for .bin package
+        # calculate hash for .bin package
         digest = self.calculate_header_hash(package_file)
         if not digest:
             UPDATE_LOGGER.print_log("calculate hash for .bin package failed",
                 log_type=UPDATE_LOGGER.ERROR_LOG)
             return False
 
-        #sign .bin header
+        # sign .bin header
         if sign_algo == SIGN_ALGO_RSA:
             signature = self.sign_digest(digest)
         elif sign_algo == SIGN_ALGO_PSS:
             signature = self.sign_digest_with_pss(digest)
         else:
-            UPDATE_LOGGER.print_log("invalid sign_algo", log_type=UPDATE_LOGGER.ERROR_LOG)
+            UPDATE_LOGGER.print_log("invalid sign_algo!", log_type=UPDATE_LOGGER.ERROR_LOG)
             return False
         if not signature:
-            UPDATE_LOGGER.print_log("sign .bin package failed", log_type=UPDATE_LOGGER.ERROR_LOG)
+            UPDATE_LOGGER.print_log("sign .bin package failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
             return False
 
-        #write signed .bin header
+        # write signed .bin header
         hash_check_data.write_signdata(signature)
         package_file.seek(self.hash_info_offset)
         package_file.write(hash_check_data.signdata)
         self.hash_info_offset += len(hash_check_data.signdata)
         UPDATE_LOGGER.print_log(
-            ".bin package header signing success! Signoffset: %s" % self.hash_info_offset)
+            ".bin package header signing success! SignOffset: %s" % self.hash_info_offset)
         return True
 
     def create_package(self):
@@ -313,7 +313,7 @@ class CreatePackage(object):
             UPDATE_LOGGER.print_log("verify param failed!", UPDATE_LOGGER.ERROR_LOG)
             return False
 
-        hash_check_data = Create_Hash(HashType.SHA256, self.head_list.entry_count)
+        hash_check_data = CreateHash(HashType.SHA256, self.head_list.entry_count)
         hash_check_data.write_hashinfo()
         package_fd = os.open(self.save_path, os.O_RDWR | os.O_CREAT, 0o755)
         with os.fdopen(package_fd, "wb+") as package_file:
@@ -336,6 +336,7 @@ class CreatePackage(object):
                     UPDATE_LOGGER.print_log("write component hash data failed: %s"
                         % self.component_list[i].component_addr, UPDATE_LOGGER.ERROR_LOG)
                     return False
+
             try:
                 # Add descriptPackageId to package
                 package_file.seek(self.compinfo_offset)

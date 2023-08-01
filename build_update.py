@@ -779,10 +779,10 @@ def unpack_package_processing():
         if not package.unpack_package():
             UPDATE_LOGGER.print_log("Unpack update package.bin failed!", UPDATE_LOGGER.ERROR_LOG)
             clear_resource(err_clear=True)
-            return
+            sys.exit(1)
         UPDATE_LOGGER.print_log("Unpack update package.bin success!")
         clear_resource()
-        return
+        sys.exit(0)
 
 
 create_entrance_args()
