@@ -55,14 +55,14 @@ public class ZipAlign {
     private static void copyFiles(List<String> entryNames, ZipFile in, ZipOutputStream out, long timestamp,
             int defaultAlignment) throws IOException {
         Collections.sort(entryNames);
-        long offset = INIT_OFFSET_LEN;
+        long fileOffset = INIT_OFFSET_LEN;
         for (String name : entryNames) {
             ZipEntry inEntry = in.getEntry(name);
             if (inEntry.getMethod() != ZipEntry.STORED) {
                 continue;
             }
 
-            offset += ZipFile.LOCHDR;
+            fileOffset += ZipFile.LOCHDR;
 
             ZipEntry outEntry = new ZipEntry(inEntry);
             outEntry.setTime(timestamp);
@@ -70,13 +70,13 @@ public class ZipAlign {
             outEntry.setComment(null);
             outEntry.setExtra(null);
 
-            offset += outEntry.getName().length();
+            fileOffset += outEntry.getName().length();
 
             int alignment = getStoredEntryDataAlignment(name, defaultAlignment);
-            if (alignment > 0 && (offset % alignment != 0)) {
-                int needed = alignment - (int) (offset % alignment);
+            if (alignment > 0 && (fileOffset % alignment != 0)) {
+                int needed = alignment - (int) (fileOffset % alignment);
                 outEntry.setExtra(new byte[needed]);
-                offset += needed;
+                fileOffset += needed;
             }
 
             out.putNextEntry(outEntry);
@@ -85,18 +85,18 @@ public class ZipAlign {
                 int num;
                 while ((num = data.read(buffer)) > 0) {
                     out.write(buffer, 0, num);
-                    offset += num;
+                    fileOffset += num;
                 }
                 out.flush();
             }
         }
     }
 
-    private static int getStoredEntryDataAlignment(String entryName, int defaultAlignment) {
+    private static int getStoredEntryDataAlignment(String entryData, int defaultAlignment) {
         if (defaultAlignment <= 0) {
             return 0;
         }
-        if (entryName.endsWith(".so")) {
+        if (entryData.endsWith(".so")) {
             return STORED_ENTRY_SO_ALIGNMENT;
         }
         return defaultAlignment;
