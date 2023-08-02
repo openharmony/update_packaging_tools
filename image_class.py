@@ -79,7 +79,7 @@ class FullUpdateImage:
             # No zip mode (no script command)
             image_write_cmd = self.verse_script.full_image_update(UPDATE_BIN_FILE_NAME)
             cmd = '%s_WRITE_FLAG%s' % (UPDATE_BIN_FILE_NAME, image_write_cmd)
-            if each_name not in FORBIDEN_UPDATE_IMAGE_LIST:
+            if each_name not in FORBIDEN_UPDATE_IMAGE_SET:
                 self.verse_script.add_command(cmd=cmd)
 
         UPDATE_LOGGER.print_log(

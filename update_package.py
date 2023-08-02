@@ -44,6 +44,7 @@ from utils import SIGN_PACKAGE_EVENT
 from utils import CHECK_BINARY_EVENT
 from utils import ZIP_EVENT
 from utils import GENERATE_SIGNED_DATA_EVENT
+from utils import DECOUPLED_EVENT
 from utils import get_extend_path_list
 from create_update_package import CreatePackage
 from create_update_package import SIGN_ALGO_RSA
@@ -418,6 +419,9 @@ def do_zip_update_package():
     zip_file.write(OPTIONS_MANAGER.build_tools_zip_obj.name, BUILD_TOOLS_FILE_NAME)
 
     zip_file.write(OPTIONS_MANAGER.board_list_file_path, "board_list")
+    decouple_res = OPTIONS_MANAGER.init.invoke_event(DECOUPLED_EVENT)
+    if decouple_res is False:
+        zip_file.write(OPTIONS_MANAGER.version_mbn_file_path, "version_list")
 
     if OPTIONS_MANAGER.max_stash_size != 0:
         max_stash_file_obj = tempfile.NamedTemporaryFile(mode="w+")

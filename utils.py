@@ -312,7 +312,7 @@ def parse_update_config(xml_path):
     full_image_path_list = []
 
     if not OPTIONS_MANAGER.not_l2:
-        expand_component(component_dict)
+        expand_component(comp_dict)
     if isinstance(component_info, OrderedDict) or isinstance(component_info, dict):
         component_info = [component_info]
     if component_info is None:
@@ -335,13 +335,13 @@ def parse_update_config(xml_path):
             OPTIONS_MANAGER.full_img_name_list.append(split_img_name(component['#text']))
             tem_path = os.path.join(OPTIONS_MANAGER.target_package_dir, component.get("#text", None))
             full_image_path_list.append(tem_path)
-            component_dict[component['@compAddr']] = component_list
+            comp_dict[component['@compAddr']] = component_list
         elif component['@compType'] == '1':
             difference_list.append(component['@compAddr'])
             OPTIONS_MANAGER.incremental_img_name_list.append(split_img_name(component['#text']))
 
     UPDATE_LOGGER.print_log('XML file parsing completed!')
-    ret_params = [head_list, component_dict, whole_list, difference_list, package_version, full_image_path_list]
+    ret_params = [head_list, comp_dict, whole_list, difference_list, package_version, full_image_path_list]
     return ret_params
 
 

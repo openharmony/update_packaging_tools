@@ -345,9 +345,21 @@ class CreatePackage(object):
             except IOError:
                 UPDATE_LOGGER.print_log("Add descriptPackageId failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
                 return False
+            self.hash_info_offset = self.compinfo_offset + UPGRADE_RESERVE_LEN
+            if OPTIONS_MANAGER.sd_card:
+                try:
+                    # Add hash check data to package
+                    hash_check_data.write_hashdata()
+                    package_file.seek(self.hash_info_offset)
+                    package_file.write(hash_check_data.hashinfo_value + hash_check_data.hashdata)
+                    self.hash_info_offset += len(hash_check_data.hashinfo_value + hash_check_data.hashdata)
+
+                except IOError:
+                    UPDATE_LOGGER.print_log("Add hash check data failed", log_type=UPDATE_LOGGER.ERROR_LOG)
+                    return False
             self.sign_header(SIGN_ALGO_RSA, hash_check_data, package_file)
             self.component_offset = self.hash_info_offset
-            for i in range(0, self.head_list.entry_conut):
+            for i in range(0, self.head_list.entry_count):
                 if not self.write_component(self.component_list[i], package_file):
                     UPDATE_LOGGER.print_log("write component failed: %s"
                         % self.component_list[i].component_addr, UPDATE_LOGGER.ERROR_LOG)
