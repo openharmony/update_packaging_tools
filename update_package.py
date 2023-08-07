@@ -172,9 +172,9 @@ def get_component_list(all_image_file_obj_list, component_dict):
     else:
         extend_component_list = []
         extend_path_list = []
-        get_path_list = OPTIONS_MANAGER.init.invoke_event(EXTEND_PATH_EVENT)
-        if get_path_list:
-            extend_path_list = get_path_list()
+    get_path_list = OPTIONS_MANAGER.init.invoke_event(EXTEND_PATH_EVENT)
+    if get_path_list:
+        extend_path_list = get_path_list()
     idx = 0
     for key, component in component_dict.items():
         if idx < len(extend_component_list):
