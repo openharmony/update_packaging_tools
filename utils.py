@@ -596,6 +596,7 @@ def get_update_info():
     :return: update information if any; false otherwise.
     """
     if not OPTIONS_MANAGER.not_l2:
+        decouple_res = OPTIONS_MANAGER.init.invoke_event(DECOUPLED_EVENT)
         OPTIONS_MANAGER.version_mbn_file_path = os.path.join(
             OPTIONS_MANAGER.target_package_config_dir, VERSION_MBN_PATH)
         version_mbn_content = \
@@ -603,7 +604,7 @@ def get_update_info():
                 OPTIONS_MANAGER.version_mbn_file_path, os.path.basename(
                     os.path.join(OPTIONS_MANAGER.target_package_config_dir,
                                  VERSION_MBN_PATH)))
-        if version_mbn_content is False:
+        if version_mbn_content is False and decouple_res is False:
             UPDATE_LOGGER.print_log(
                 "Get version mbn content failed!",
                 log_type=UPDATE_LOGGER.ERROR_LOG)

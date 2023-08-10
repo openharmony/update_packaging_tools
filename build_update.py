@@ -331,7 +331,7 @@ def check_incremental_args(no_zip, partition_file, source_package,
     partition_change = OPTIONS_MANAGER.init.invoke_event(PARTITION_CHANGE_EVENT)
     if callable(partition_change) and partition_change() is False:
         return False
-    UPDATE_LOGGER.print_log("Partition interception check finish.", UPDATE_LOGGER.ERROR_LOG)
+    UPDATE_LOGGER.print_log("Partition interception check finish.", UPDATE_LOGGER.INFO_LOG)
     xml_path = ''
     if OPTIONS_MANAGER.source_package_dir is not False:
         xml_path = os.path.join(OPTIONS_MANAGER.source_package_dir, UPDATER_CONFIG, XML_FILE_PATH)
