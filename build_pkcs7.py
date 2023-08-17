@@ -33,7 +33,7 @@ operation_path = os.path.dirname(os.path.realpath(__file__))
 CERT_PATH = os.path.join(operation_path, 'sign_cert/signing_cert.crt')
 BLOCK_SIZE = 8192
 FOOTER_LENGTH = 6
-ZIP_ECOD_LENGTH = 22
+ZIP_EOCD_LENGTH = 22
 DIGEST_SHA256 = 672
 SHA256_HASH_LEN = 32
 
@@ -60,7 +60,7 @@ def calculate_package_hash(package_path):
     hash_sha256 = hashlib.sha256()
     length = 0
 
-    remain_len = os.path.getsize(package_path) - ZIP_ECOD_LENGTH
+    remain_len = os.path.getsize(package_path) - ZIP_EOCD_LENGTH
     with open(package_path, 'rb') as package_file:
         while remain_len > BLOCK_SIZE:
             hash_sha256.update(package_file.read(BLOCK_SIZE))

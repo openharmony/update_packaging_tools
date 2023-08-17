@@ -21,14 +21,15 @@ import json
 import os
 import shutil
 import tempfile
-import zipfile
 from collections import OrderedDict
+import xmltodict
+import zipfile
+
+from build_pkcs7 import sign_ota_package
 from copy import copy
 from ctypes import cdll
 from cryptography.hazmat.primitives import hashes
 from log_exception import UPDATE_LOGGER
-import xmltodict
-from build_pkcs7 import sign_ota_package
 
 operation_path = os.path.dirname(os.path.realpath(__file__))
 PRODUCT = 'hi3516'
@@ -284,8 +285,7 @@ def parse_update_config(xml_path):
         with open(xml_path, 'r') as xml_file:
             xml_str = xml_file.read()
     else:
-        UPDATE_LOGGER.print_log("XML file does not exist! xml path: %s" %
-                                xml_path, UPDATE_LOGGER.ERROR_LOG)
+        UPDATE_LOGGER.print_log("XML file does not exist! xml path: %s" % xml_path, UPDATE_LOGGER.ERROR_LOG)
         ret_params = [False, False, False, False, False, False, False]
         return ret_params
     xml_content_dict = xmltodict.parse(xml_str, encoding='utf-8')
@@ -299,44 +299,38 @@ def parse_update_config(xml_path):
     head_list.pop()
     whole_list = []
     difference_list = []
-    component_dict = {}
+    comp_dict = {}
     full_image_path_list = []
 
     if not OPTIONS_MANAGER.not_l2:
-        expand_component(component_dict)
+        expand_component(comp_dict)
     if isinstance(component_info, OrderedDict) or isinstance(component_info, dict):
         component_info = [component_info]
     if component_info is None:
         ret_params = [[], {}, [], [], '', [], False]
         return ret_params
     for component in component_info:
+        if component['@compAddr'] == 'userdata' and not OPTIONS_MANAGER.sd_card:
+            continue
         component_list = list(component.values())
         component_list.pop()
-
         if component['@compAddr'] in (whole_list + difference_list):
-            UPDATE_LOGGER.print_log("This component %s  repeats!" %
-                                    component['@compAddr'],
-                                    UPDATE_LOGGER.ERROR_LOG)
+            UPDATE_LOGGER.print_log("This component %s  repeats!" % component['@compAddr'], UPDATE_LOGGER.ERROR_LOG)
             ret_params = [False, False, False, False, False, False, False]
             return ret_params
 
         if component['@compType'] == '0':
             whole_list.append(component['@compAddr'])
-            OPTIONS_MANAGER.full_img_name_list.\
-                append(split_img_name(component['#text']))
-            tem_path = os.path.join(OPTIONS_MANAGER.target_package_dir,
-                                    component.get("#text", None))
+            OPTIONS_MANAGER.full_img_name_list.append(split_img_name(component['#text']))
+            tem_path = os.path.join(OPTIONS_MANAGER.target_package_dir, component.get("#text", None))
             full_image_path_list.append(tem_path)
-            component_dict[component['@compAddr']] = component_list
+            comp_dict[component['@compAddr']] = component_list
         elif component['@compType'] == '1':
             difference_list.append(component['@compAddr'])
-            OPTIONS_MANAGER.incremental_img_name_list.\
-                append(split_img_name(component['#text']))
+            OPTIONS_MANAGER.incremental_img_name_list.append(split_img_name(component['#text']))
 
     UPDATE_LOGGER.print_log('XML file parsing completed!')
-    ret_params = [head_list, component_dict,
-                  whole_list, difference_list, package_version,
-                  full_image_path_list]
+    ret_params = [head_list, comp_dict, whole_list, difference_list, package_version, full_image_path_list]
     return ret_params
 
 

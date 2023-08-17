@@ -97,8 +97,7 @@ def create_update_bin():
     :return update_bin_obj: Update file object.
                             If exception occurs, return False.
     """
-    update_bin_obj = tempfile.NamedTemporaryFile(
-        dir=OPTIONS_MANAGER.update_package, prefix="update_bin-")
+    update_bin_obj = tempfile.NamedTemporaryFile(dir=OPTIONS_MANAGER.update_package, prefix="update_bin-")
 
     head_value_list = OPTIONS_MANAGER.head_info_list
     component_dict = OPTIONS_MANAGER.component_info_dict
@@ -115,8 +114,7 @@ def create_update_bin():
         all_image_name = full_img_list
     sort_component_dict = collect.OrderedDict()
     for each_image_name in all_image_name:
-        sort_component_dict[each_image_name] = \
-            component_dict.get(each_image_name)
+        sort_component_dict[each_image_name] = component_dict.get(each_image_name)
     component_dict = copy.deepcopy(sort_component_dict)
     head_list = get_head_list(len(component_dict), head_value_list)
 
@@ -135,15 +133,12 @@ def create_update_bin():
         sign_algo = SIGN_ALGO_RSA
     
     # create bin
-    package = CreatePackage(head_list, component_list, save_patch,
-        OPTIONS_MANAGER.private_key)
+    package = CreatePackage(head_list, component_list, save_patch, OPTIONS_MANAGER.private_key)
     if not package.create_package():
-        UPDATE_LOGGER.print_log(
-            "Create update package .bin failed!", UPDATE_LOGGER.ERROR_LOG)
+        UPDATE_LOGGER.print_log("Create update package .bin failed!", UPDATE_LOGGER.ERROR_LOG)
         return False
 
-    UPDATE_LOGGER.print_log(
-        "Create update package .bin complete! path: %s" % update_bin_obj.name)
+    UPDATE_LOGGER.print_log("Create update package .bin complete! path: %s" % update_bin_obj.name)
     return update_bin_obj
 
 
@@ -160,8 +155,7 @@ def get_component_list(all_image_file_obj_list, component_dict):
     component_list = pkg_components()
     if not OPTIONS_MANAGER.not_l2:
         if OPTIONS_MANAGER.partition_file_obj is not None:
-            extend_component_list = \
-                EXTEND_COMPONENT_LIST + EXTEND_OPTIONAL_COMPONENT_LIST
+            extend_component_list = EXTEND_COMPONENT_LIST + EXTEND_OPTIONAL_COMPONENT_LIST
             extend_path_list = [OPTIONS_MANAGER.version_mbn_file_path,
                                 OPTIONS_MANAGER.board_list_file_path,
                                 OPTIONS_MANAGER.partition_file_obj.name]
@@ -177,8 +171,7 @@ def get_component_list(all_image_file_obj_list, component_dict):
         if idx < len(extend_component_list):
             file_path = extend_path_list[idx]
         else:
-            file_path = \
-                all_image_file_obj_list[idx - len(extend_component_list)].name
+            file_path = all_image_file_obj_list[idx - len(extend_component_list)].name
         digest = get_hash_content(file_path, OPTIONS_MANAGER.hash_algorithm)
         if not digest:
             return
@@ -189,11 +182,9 @@ def get_component_list(all_image_file_obj_list, component_dict):
             binascii.a2b_hex(digest.encode('utf-8')))
         component_list[idx].file_path = file_path.encode("utf-8")
         if not OPTIONS_MANAGER.not_l2:
-            component_list[idx].component_addr = \
-                ('/%s' % component[0]).encode("utf-8")
+            component_list[idx].component_addr = ('/%s' % component[0]).encode("utf-8")
         else:
-            component_list[idx].component_addr = \
-                ('%s' % component[0]).encode("utf-8")
+            component_list[idx].component_addr = ('%s' % component[0]).encode("utf-8")
         component_list[idx].version = component[4].encode("utf-8")
         component_list[idx].size = os.path.getsize(file_path)
         component_list[idx].id = int(component[1])
@@ -339,16 +330,14 @@ def create_build_tools_zip():
         get_tools_component_list(count, opera_script_dict)
     total_script_file_obj = OPTIONS_MANAGER.total_script_file_obj
     register_script_file_obj = OPTIONS_MANAGER.register_script_file_obj
-    update_exe_path = os.path.join(OPTIONS_MANAGER.target_package_dir,
-                                   UPDATE_EXE_FILE_NAME)
+    update_exe_path = os.path.join(OPTIONS_MANAGER.target_package_dir, UPDATE_EXE_FILE_NAME)
     if not os.path.exists(update_exe_path):
         UPDATE_LOGGER.print_log(
             "updater_binary file does not exist!path: %s" % update_exe_path,
             log_type=UPDATE_LOGGER.ERROR_LOG)
         return False
 
-    file_obj = tempfile.NamedTemporaryFile(
-        dir=OPTIONS_MANAGER.update_package, prefix="build_tools-")
+    file_obj = tempfile.NamedTemporaryFile(dir=OPTIONS_MANAGER.update_package, prefix="build_tools-")
     files_to_sign = []
     zip_file = zipfile.ZipFile(file_obj.name, 'w', zipfile.ZIP_DEFLATED)
     # file name will be prefixed by build_tools in hash signed data
@@ -372,6 +361,37 @@ def create_build_tools_zip():
     if create_hsd_for_build_tools(zip_file, files_to_sign) is False:
         return False
     return file_obj
+
+
+def do_sign_package(update_package, update_file_name):
+    signed_package = os.path.join(
+            update_package, "%s.zip" % update_file_name)
+    OPTIONS_MANAGER.signed_package = signed_package
+    if os.path.exists(signed_package):
+        os.remove(signed_package)
+
+    sign_ota_package = \
+        OPTIONS_MANAGER.init.invoke_event(SIGN_PACKAGE_EVENT)
+    if sign_ota_package:
+        return sign_ota_package()
+    else:
+        return sign_package()
+
+
+def get_update_file_name():
+    if OPTIONS_MANAGER.sd_card :
+        package_type = "sd"
+    elif OPTIONS_MANAGER.source_package :
+        package_type = "diff"
+    else :
+        package_type = "full"
+    if OPTIONS_MANAGER.not_l2:
+        update_file_name = ''.join(
+            ["updater_", OPTIONS_MANAGER.target_package_version.replace(" ", "_")])
+    else :
+        update_file_name = ''.join(
+            ["updater_", package_type])
+    return update_file_name
 
 
 def do_zip_update_package():
@@ -398,6 +418,7 @@ def do_zip_update_package():
         zip_file.write(patch_obj.name, "%s.patch.dat" % partition)
 
     zip_file.close()
+    return True
 
 
 def create_hsd_for_build_tools(zip_file, files_to_sign):
@@ -438,18 +459,7 @@ def build_update_package(no_zip, update_package, prelude_script,
     else:
         return False
 
-    if OPTIONS_MANAGER.sd_card :
-        package_type = "sd"
-    elif OPTIONS_MANAGER.source_package :
-        package_type = "diff"
-    else :
-        package_type = "full"
-    if OPTIONS_MANAGER.not_l2:
-        update_file_name = ''.join(
-            ["updater_", OPTIONS_MANAGER.target_package_version.replace(" ", "_")])
-    else :
-        update_file_name = ''.join(
-            ["updater_", package_type])
+    update_file_name = get_update_file_name()
             
     if not no_zip:
         update_package_path = os.path.join(
@@ -467,20 +477,11 @@ def build_update_package(no_zip, update_package, prelude_script,
             return False
         OPTIONS_MANAGER.build_tools_zip_obj = build_tools_zip_obj
 
-        do_zip_update_package()
+        if not do_zip_update_package():
+            UPDATE_LOGGER.print_log("Zip update package fail", UPDATE_LOGGER.ERROR_LOG)
+            return False
 
-        signed_package = os.path.join(
-            update_package, "%s.zip" % update_file_name)
-        OPTIONS_MANAGER.signed_package = signed_package
-        if os.path.exists(signed_package):
-            os.remove(signed_package)
-
-        sign_ota_package = \
-            OPTIONS_MANAGER.init.invoke_event(SIGN_PACKAGE_EVENT)
-        if sign_ota_package:
-            sign_result = sign_ota_package()
-        else:
-            sign_result = sign_package()
+        sign_result = do_sign_package(update_package, update_file_name)
 
         if not sign_result:
             UPDATE_LOGGER.print_log("Sign ota package fail", UPDATE_LOGGER.ERROR_LOG)

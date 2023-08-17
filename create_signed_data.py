@@ -30,8 +30,10 @@ def sign_func_sha256(sign_file, private_key_file):
     """
     hash_sha256 = hashlib.sha256()
     with open(sign_file, 'rb') as file:
-        while chunk := file.read(BLOCK_SIZE):
+        chunk = file.read(BLOCK_SIZE)
+        while chunk:
             hash_sha256.update(chunk)
+            chunk = file.read(BLOCK_SIZE)
     signature = sign_digest(hash_sha256.digest(), private_key_file)
     if signature == False:
         UPDATE_LOGGER.print_log("sign digest failed", log_type=UPDATE_LOGGER.ERROR_LOG)
