@@ -319,8 +319,7 @@ class CreatePackage(object):
         with os.fdopen(package_fd, "wb+") as package_file:
             # Add information to package
             if not self.write_pkginfo(package_file):
-                UPDATE_LOGGER.print_log(
-                    "Write pkginfo failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
+                UPDATE_LOGGER.print_log("Write pkginfo failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
                 return False
             # Add component to package
             self.compinfo_offset = UPGRADE_FILE_HEADER_LEN
@@ -328,8 +327,7 @@ class CreatePackage(object):
                 self.head_list.entry_count * self.upgrade_compinfo_size + \
                 UPGRADE_RESERVE_LEN + SIGN_SHA256_LEN + SIGN_SHA384_LEN
             for i in range(0, self.head_list.entry_count):
-                UPDATE_LOGGER.print_log("Add component %s"
-                    % self.component_list[i].component_addr)
+                UPDATE_LOGGER.print_log("Add component %s" % self.component_list[i].component_addr)
                 if not self.write_component_info(self.component_list[i], package_file):
                     UPDATE_LOGGER.print_log("write component info failed: %s"
                         % self.component_list[i].component_addr, UPDATE_LOGGER.ERROR_LOG)
@@ -345,10 +343,8 @@ class CreatePackage(object):
                 package_file.write(
                     (self.head_list.describe_package_id.decode().ljust(UPGRADE_RESERVE_LEN, "\0")).encode())
             except IOError:
-                UPDATE_LOGGER.print_log(
-                    "Add descriptPackageId failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
+                UPDATE_LOGGER.print_log("Add descriptPackageId failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
                 return False
-
             self.hash_info_offset = self.compinfo_offset + UPGRADE_RESERVE_LEN
             if OPTIONS_MANAGER.sd_card:
                 try:
@@ -359,8 +355,7 @@ class CreatePackage(object):
                     self.hash_info_offset += len(hash_check_data.hashinfo_value + hash_check_data.hashdata)
 
                 except IOError:
-                    UPDATE_LOGGER.print_log(
-                        "Add hash check data failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
+                    UPDATE_LOGGER.print_log("Add hash check data failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
                     return False
             self.sign_header(SIGN_ALGO_RSA, hash_check_data, package_file)
             self.component_offset = self.hash_info_offset
@@ -369,6 +364,5 @@ class CreatePackage(object):
                     UPDATE_LOGGER.print_log("write component failed: %s"
                         % self.component_list[i].component_addr, UPDATE_LOGGER.ERROR_LOG)
                     return False
-
         UPDATE_LOGGER.print_log("Write update package complete")
         return True

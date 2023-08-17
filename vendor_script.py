@@ -80,7 +80,6 @@ class ExtensionCmdRegister:
         """
         self.__cmd_in_so_dict = {}
 
-
     def generate_register_cmd_script(self):
         """
         Generate the register script.
