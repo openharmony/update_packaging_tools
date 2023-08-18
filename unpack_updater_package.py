@@ -110,7 +110,7 @@ class UnpackPackage(object):
             package_file.seek(self.addr_offset)
             component_addr = package_file.read(self.addr_size)
             component_addr = component_addr.split(b"\x00")[0].decode('utf-8')
-            
+
             package_file.seek(self.type_offset)
             component_type_buffer = package_file.read(COMPONENT_TYPE_SIZE)
             component_type = struct.unpack(COMPONENT_TYPE_FMT, component_type_buffer)
