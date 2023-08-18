@@ -131,7 +131,7 @@ def create_update_bin():
         sign_algo = SIGN_ALGO_PSS
     else:
         sign_algo = SIGN_ALGO_RSA
-    
+
     # create bin
     package = CreatePackage(head_list, component_list, save_patch, OPTIONS_MANAGER.private_key)
     if not package.create_package():
@@ -460,7 +460,7 @@ def build_update_package(no_zip, update_package, prelude_script,
         return False
 
     update_file_name = get_update_file_name()
-            
+ 
     if not no_zip:
         update_package_path = os.path.join(
             update_package, '%s_unsigned.zip' % update_file_name)

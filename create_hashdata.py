@@ -58,6 +58,7 @@ HASH_INFO_FMT = "<3HI"
 HASH_DATA_HEADER_FMT = "<32sHI"
 HASH_DATA_ADDR_FMT = "<2I"
 
+
 class CreateHash(object):
     """
     Create the component hash data
@@ -128,7 +129,8 @@ class CreateHash(object):
                 component_len = os.path.getsize(component.file_path)
                 block_num = component_len // HASH_BLOCK_SIZE
                 component_name = component.component_addr.decode().ljust(COMPONENT_NAME_SIZE, "\0")
-                UPDATE_LOGGER.print_log("calc component hash  component name:%s %d" % (component_name,len(component_name)))
+                UPDATE_LOGGER.print_log(
+                    "calc component hash component name:%s %d" % (component_name, len(component_name)))
                 total_block = block_num + 1 if component_len % HASH_BLOCK_SIZE > 0 else block_num
                 self.hashdata += struct.pack(HASH_DATA_HEADER_FMT, component_name.encode(),
                     total_block, component_len)
@@ -193,25 +195,27 @@ class CreateHash(object):
         return True
 
     def parse_print_hashdata(self, save_path):
-        hash_check_file_p = open(os.path.join(save_path + "hash_check_file_parse"), "wb+")
-        hash_check_file_p.write(("hash info:").encode())
-        hash_check_file_p.write((HashType(self.hash_type.value).name + ' ' + str(self.hash_digest_size) + \
-            ' ' + str(self.component_num) + ' ' + str(self.block_size) + '\n').encode())
+        hash_check_fd = open(os.path.join(save_path + "hash_check_file_parse"), os.O_RDWR | os.O_CREAT, 0o755)
+        with os.fdopen(hash_check_fd, "wb+") as hash_check_file_p:
+            hash_check_file_p.write(("hash info:").encode())
+            hash_check_file_p.write(("%s %s %s %s\n" % (
+                HashType(self.hash_type.value).name, str(self.hash_digest_size),
+                str(self.component_num), str(self.block_size))).encode())
 
-        offset = 0
-        for i in range(0, self.component_num):
-            hash_check_file_p.write((self.hashdata_list[offset][0] + '\n').encode())
-            hash_check_file_p.write((str(self.hashdata_list[offset][1]) + ' ' + \
-                str(self.hashdata_list[offset][2]) + '\n').encode())
-            for j in range(0, self.hashdata_list[offset][1]):
-                index = offset + 1
-                hashdata_hexstr = "".join("%02x" % b for b in self.hashdata_list[j + index][2])
-                hash_check_file_p.write((str(self.hashdata_list[j + index][0]) + ' ' + \
-                    str(self.hashdata_list[j + index][1]) + ' ' + hashdata_hexstr + \
-                    '\n').encode())
-            offset += (1 + self.hashdata_list[offset][1])
+            offset = 0
+            for i in range(0, self.component_num):
+                hash_check_file_p.write(("%s\n" % (self.hashdata_list[offset][0])).encode())
+                hash_check_file_p.write(("%s %s\n" % (
+                    str(self.hashdata_list[offset][1]), str(self.hashdata_list[offset][2]))).encode())
+                for j in range(0, self.hashdata_list[offset][1]):
+                    index = offset + 1
+                    hashdata_hexstr = "".join("%02x" % b for b in self.hashdata_list[j + index][2])
+                    hash_check_file_p.write(("%s" % (
+                        str(self.hashdata_list[j + index][0]), str(self.hashdata_list[j + index][1]),
+                        hashdata_hexstr)).encode())
 
-        signdata_hexstr = "".join("%02x" % b for b in self.signdata)
-        hash_check_file_p.write(("hash sign:").encode())
-        hash_check_file_p.write(signdata_hexstr.encode())
-        hash_check_file_p.close()
+                offset += (1 + self.hashdata_list[offset][1])
+
+            signdata_hexstr = "".join("%02x" % b for b in self.signdata)
+            hash_check_file_p.write(("hash sign:").encode())
+            hash_check_file_p.write(signdata_hexstr.encode())
