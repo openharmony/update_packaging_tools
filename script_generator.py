@@ -231,7 +231,7 @@ class VerseScript(Script):
         """
         cmd = 'update_partitions("/%s");\n' % PARTITION_FILE
         return cmd
-    
+
     def full_image_update(self, update_file_name):
         cmd = 'update_from_bin("%s");\n' % update_file_name
         return cmd

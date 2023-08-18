@@ -800,7 +800,7 @@ def main():
         partition_file, signing_algorithm, hash_algorithm, private_key = get_args()
     if not_l2:
         no_zip = True
-    
+
     # Unpack updater package
     unpack_package_processing()
 

@@ -355,7 +355,7 @@ class CreatePackage(object):
                     self.hash_info_offset += len(hash_check_data.hashinfo_value + hash_check_data.hashdata)
 
                 except IOError:
-                    UPDATE_LOGGER.print_log("Add hash check data failed", log_type=UPDATE_LOGGER.ERROR_LOG)
+                    UPDATE_LOGGER.print_log("Add hash check data failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
                     return False
             self.sign_header(SIGN_ALGO_RSA, hash_check_data, package_file)
             self.component_offset = self.hash_info_offset

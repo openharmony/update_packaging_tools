@@ -25,11 +25,11 @@ from collections import OrderedDict
 import xmltodict
 import zipfile
 
+from cryptography.hazmat.primitives import hashes
+from log_exception import UPDATE_LOGGER
 from build_pkcs7 import sign_ota_package
 from copy import copy
 from ctypes import cdll
-from cryptography.hazmat.primitives import hashes
-from log_exception import UPDATE_LOGGER
 
 operation_path = os.path.dirname(os.path.realpath(__file__))
 PRODUCT = 'hi3516'
@@ -127,19 +127,8 @@ class ExtInit:
         return False
 
 
-@singleton
-class OptionsManager:
-    """
-    Options management class
-    """
-
+class BaseOptionsManager:
     def __init__(self):
-        self.init = ExtInit()
-        self.parser = argparse.ArgumentParser()
-
-        # Own parameters
-        self.product = None
-
         # Entry parameters
         self.source_package = None
         self.target_package = None
@@ -156,6 +145,23 @@ class OptionsManager:
         self.sd_card = False
 
         self.make_dir_path = None
+
+
+@singleton
+class OptionsManager(BaseOptionsManager):
+    """
+    Options management class
+    """
+
+    def __init__(self):
+        super().__init__()
+
+        self.init = ExtInit()
+        self.parser = argparse.ArgumentParser()
+
+        # Own parameters
+        self.product = None
+
 
         # Parsed package parameters
         self.target_package_dir = None
@@ -340,7 +346,6 @@ def parse_update_config(xml_path):
             difference_list.append(component['@compAddr'])
             OPTIONS_MANAGER.incremental_img_name_list.append(split_img_name(component['#text']))
 
-    UPDATE_LOGGER.print_log('XML file parsing completed!')
     ret_params = [head_list, comp_dict, whole_list, difference_list, package_version, full_image_path_list]
     return ret_params
 
@@ -618,9 +623,7 @@ def get_update_info():
                     os.path.join(OPTIONS_MANAGER.target_package_config_dir,
                                  BOARD_LIST_PATH)))
         if board_list_content is False:
-            UPDATE_LOGGER.print_log(
-                "Get board list content failed!",
-                log_type=UPDATE_LOGGER.ERROR_LOG)
+            UPDATE_LOGGER.print_log("Get board list content failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
             return False
         OPTIONS_MANAGER.board_list_content = board_list_content
 
@@ -636,11 +639,10 @@ def get_update_info():
         OPTIONS_MANAGER.target_package_version, \
         OPTIONS_MANAGER.full_image_path_list = \
         parse_update_config(xml_file_path)
+    UPDATE_LOGGER.print_log("XML file parsing completed!")
     if head_info_list is False or component_info_dict is False or \
             full_img_list is False or incremental_img_list is False:
-        UPDATE_LOGGER.print_log(
-            "Get parse update config xml failed!",
-            log_type=UPDATE_LOGGER.ERROR_LOG)
+        UPDATE_LOGGER.print_log("Get parse update config xml failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
         return False
     OPTIONS_MANAGER.head_info_list, OPTIONS_MANAGER.component_info_dict, \
         OPTIONS_MANAGER.full_img_list, OPTIONS_MANAGER.incremental_img_list = \
