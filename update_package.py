@@ -551,3 +551,4 @@ def get_hash_content(file_path, hash_algorithm):
         UPDATE_LOGGER.print_log(
             "Get hash content success! path: %s" % file_path)
     return hash_content
+
