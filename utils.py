@@ -77,7 +77,16 @@ PER_BLOCK_SIZE = 4096
 VERSE_SCRIPT_EVENT = 0
 INC_IMAGE_EVENT = 1
 SIGN_PACKAGE_EVENT = 2
-GENERATE_SIGNED_DATA_EVENT = 6 # sign build tools files to get hash_signed_data
+CHECK_BINARY_EVENT = 3
+CONFIG_EVENT = 4
+EXTEND_PATH_EVENT = 5
+ZIP_EVENT = 6
+GENERATE_SIGNED_DATA_EVENT = 7 # sign build tools files to get hash_signed_data
+PARTITION_CHANGE_EVENT = 8
+DECOUPLED_EVENT = 9
+
+# Image file can not support update.
+FORBIDEN_UPDATE_IMAGE_SET = {"ptable"}
 
 # 1000000: max number of function recursion depth
 MAXIMUM_RECURSION_DEPTH = 1000000
@@ -320,6 +329,8 @@ def parse_update_config(xml_path):
             continue
         component_list = list(component.values())
         component_list.pop()
+        comp_dict[component['@compAddr']] = component_list
+    
         if component['@compAddr'] in (whole_list + difference_list):
             UPDATE_LOGGER.print_log("This component %s  repeats!" % component['@compAddr'], UPDATE_LOGGER.ERROR_LOG)
             ret_params = [False, False, False, False, False, False, False]
@@ -401,17 +412,26 @@ def parse_partition_file_xml(xml_path):
     return file_obj, partitions_list, partitions_file_path_list
 
 
+def get_extend_path_list():
+    get_config_list = OPTIONS_MANAGER.init.invoke_event(CONFIG_EVENT)
+    if get_config_list:
+        return get_config_list()
+    else:
+        return EXTEND_COMPONENT_LIST
+
+
 def expand_component(component_dict):
     """
     Append components such as VERSION.mbn and board list.
     :param component_dict: component information dict
     :return:
     """
+    extend_path_list = get_extend_path_list()
     if OPTIONS_MANAGER.partition_file is not None:
         extend_component_list = \
-            EXTEND_COMPONENT_LIST + EXTEND_OPTIONAL_COMPONENT_LIST
+            extend_path_list + EXTEND_OPTIONAL_COMPONENT_LIST
     else:
-        extend_component_list = EXTEND_COMPONENT_LIST
+        extend_component_list = extend_path_list
     for each in extend_component_list:
         tmp_info_list = copy(COMPONENT_INFO_INNIT)
         tmp_info_list[0] = each
@@ -581,6 +601,7 @@ def get_update_info():
     :return: update information if any; false otherwise.
     """
     if not OPTIONS_MANAGER.not_l2:
+        decouple_res = OPTIONS_MANAGER.init.invoke_event(DECOUPLED_EVENT)
         OPTIONS_MANAGER.version_mbn_file_path = os.path.join(
             OPTIONS_MANAGER.target_package_config_dir, VERSION_MBN_PATH)
         version_mbn_content = \
@@ -588,8 +609,10 @@ def get_update_info():
                 OPTIONS_MANAGER.version_mbn_file_path, os.path.basename(
                     os.path.join(OPTIONS_MANAGER.target_package_config_dir,
                                  VERSION_MBN_PATH)))
-        if version_mbn_content is False:
-            UPDATE_LOGGER.print_log("Get version mbn content failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
+        if version_mbn_content is False and decouple_res is False:
+            UPDATE_LOGGER.print_log(
+                "Get version mbn content failed!",
+                log_type=UPDATE_LOGGER.ERROR_LOG)
             return False
         OPTIONS_MANAGER.version_mbn_content = version_mbn_content
         OPTIONS_MANAGER.board_list_file_path = os.path.join(

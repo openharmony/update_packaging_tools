@@ -195,7 +195,7 @@ class CreateHash(object):
         return True
 
     def parse_print_hashdata(self, save_path):
-        hash_check_fd = open(os.path.join(save_path + "hash_check_file_parse"), os.O_RDWR | os.O_CREAT, 0o755)
+        hash_check_fd = os.open(os.path.join(save_path + "hash_check_file_parse"), os.O_RDWR | os.O_CREAT, 0o755)
         with os.fdopen(hash_check_fd, "wb+") as hash_check_file_p:
             hash_check_file_p.write(("hash info:").encode())
             hash_check_file_p.write(("%s %s %s %s\n" % (

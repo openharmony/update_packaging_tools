@@ -152,6 +152,14 @@ class PatchProcess:
                     each_action, max_stashed_blocks, src_str,
                     stashed_blocks, tgt_size, total_blocks_count,
                     transfer_content)
+        elif each_action .tgt_block_set.size() > 125 * 1024: # target_file_size > 125 * 1024 * 4KB = 500M
+            each_action.type_str = ActionType.NEW
+            new_dat_file_obj, patch_dat_file_obj, transfer_list_file_obj = \
+                self.package_patch_zip.get_file_obj()
+            total_blocks_count = \
+                self.apply_new_type(each_action, new_dat_file_obj,
+                                    tgt_size, total_blocks_count,
+                                    transfer_content)
         else:
             do_pkg_diff, patch_value = self.compute_diff_patch(
                 each_action, patch_dat_file_obj)

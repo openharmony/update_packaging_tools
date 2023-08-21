@@ -80,6 +80,8 @@ from utils import MAXIMUM_RECURSION_DEPTH
 from utils import VERSE_SCRIPT_EVENT
 from utils import INC_IMAGE_EVENT
 from utils import DIFF_EXE_PATH
+from utils import PARTITION_CHANGE_EVENT
+from utils import DECOUPLED_EVENT
 from utils import get_update_config_softversion
 from vendor_script import create_vendor_script_class
 
@@ -326,6 +328,10 @@ def check_incremental_args(no_zip, partition_file, source_package,
 
     if not get_source_package_path(source_package):
         return False
+    partition_change = OPTIONS_MANAGER.init.invoke_event(PARTITION_CHANGE_EVENT)
+    if callable(partition_change) and partition_change() is False:
+        return False
+    UPDATE_LOGGER.print_log("Partition interception check finish.", UPDATE_LOGGER.INFO_LOG)
     xml_path = ''
     if OPTIONS_MANAGER.source_package_dir is not False:
         xml_path = os.path.join(OPTIONS_MANAGER.source_package_dir, UPDATER_CONFIG, XML_FILE_PATH)
@@ -339,15 +345,18 @@ def check_incremental_args(no_zip, partition_file, source_package,
         UPDATE_LOGGER.print_log("XML file does not exist! xml path: %s" %
                                 xml_path, UPDATE_LOGGER.ERROR_LOG)
         return False
+    
     xml_content_dict = xmltodict.parse(xml_str, encoding='utf-8')
     package_dict = xml_content_dict.get('package', {})
     get_update_config_softversion(OPTIONS_MANAGER.source_package_dir, package_dict.get('head', {}))
     head_dict = package_dict.get('head', {}).get('info')
     OPTIONS_MANAGER.source_package_version = head_dict.get("@softVersion")
-    if check_package_version(OPTIONS_MANAGER.target_package_version,
-                             OPTIONS_MANAGER.source_package_version) is False:
-        clear_resource(err_clear=True)
-        return False
+    no_need_version_check_res = OPTIONS_MANAGER.init.invoke_event(DECOUPLED_EVENT)
+    if no_need_version_check_res is False:
+        if check_package_version(OPTIONS_MANAGER.target_package_version,
+                                OPTIONS_MANAGER.source_package_version) is False:
+            clear_resource(err_clear=True)
+            return False
     return True
 
 
@@ -618,11 +627,6 @@ def increment_image_processing(
                 "Source Image is the same as Target Image! src image path: %s, tgt image path: %s"
                 % (each_src_image_path, each_tgt_image_path), UPDATE_LOGGER.INFO_LOG)
             OPTIONS_MANAGER.incremental_img_list.remove(each_img)
-            first_block_check_cmd = verse_script.first_block_check(each_img)
-            abort_cmd = verse_script.abort(each_img)
-            cmd = 'if ({first_block_check_cmd} != 0)' '{{\n    {abort_cmd}}}\n'.format(
-            first_block_check_cmd=first_block_check_cmd, abort_cmd=abort_cmd)
-            script_check_cmd_list.append(cmd)
             continue
 
         src_generate_map = True

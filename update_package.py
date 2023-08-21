@@ -36,12 +36,16 @@ from utils import EXTEND_OPTIONAL_COMPONENT_LIST
 from utils import COMPONENT_INFO_INNIT
 from utils import UPDATE_EXE_FILE_NAME
 from utils import TOTAL_SCRIPT_FILE_NAME
-from utils import EXTEND_COMPONENT_LIST
+from utils import EXTEND_PATH_EVENT
 from utils import LINUX_HASH_ALGORITHM_DICT
 from utils import UPDATE_BIN_FILE_NAME
 from utils import BUILD_TOOLS_FILE_NAME
 from utils import SIGN_PACKAGE_EVENT
+from utils import CHECK_BINARY_EVENT
+from utils import ZIP_EVENT
 from utils import GENERATE_SIGNED_DATA_EVENT
+from utils import DECOUPLED_EVENT
+from utils import get_extend_path_list
 from create_update_package import CreatePackage
 from create_update_package import SIGN_ALGO_RSA
 from create_update_package import SIGN_ALGO_PSS
@@ -104,12 +108,13 @@ def create_update_bin():
     full_image_file_obj_list = OPTIONS_MANAGER.full_image_file_obj_list
     full_img_list = OPTIONS_MANAGER.full_img_list
 
+    extend_component_list = get_extend_path_list()
     if not OPTIONS_MANAGER.not_l2:
         if OPTIONS_MANAGER.partition_file_obj is not None:
             all_image_name = \
-                EXTEND_COMPONENT_LIST + EXTEND_OPTIONAL_COMPONENT_LIST + full_img_list
+                extend_component_list + EXTEND_OPTIONAL_COMPONENT_LIST + full_img_list
         else:
-            all_image_name = EXTEND_COMPONENT_LIST + full_img_list
+            all_image_name = extend_component_list + full_img_list
     else:
         all_image_name = full_img_list
     sort_component_dict = collect.OrderedDict()
@@ -153,19 +158,23 @@ def get_component_list(all_image_file_obj_list, component_dict):
     """
     pkg_components = PkgComponent * len(component_dict)
     component_list = pkg_components()
+    extend_list = get_extend_path_list()
     if not OPTIONS_MANAGER.not_l2:
         if OPTIONS_MANAGER.partition_file_obj is not None:
-            extend_component_list = EXTEND_COMPONENT_LIST + EXTEND_OPTIONAL_COMPONENT_LIST
+            extend_component_list = extend_list + EXTEND_OPTIONAL_COMPONENT_LIST
             extend_path_list = [OPTIONS_MANAGER.version_mbn_file_path,
                                 OPTIONS_MANAGER.board_list_file_path,
                                 OPTIONS_MANAGER.partition_file_obj.name]
         else:
-            extend_component_list = EXTEND_COMPONENT_LIST
+            extend_component_list = extend_list
             extend_path_list = [OPTIONS_MANAGER.version_mbn_file_path,
                                 OPTIONS_MANAGER.board_list_file_path]
     else:
         extend_component_list = []
         extend_path_list = []
+    get_path_list = OPTIONS_MANAGER.init.invoke_event(EXTEND_PATH_EVENT)
+    if get_path_list:
+        extend_path_list = get_path_list()
     idx = 0
     for key, component in component_dict.items():
         if idx < len(extend_component_list):
@@ -326,16 +335,10 @@ def create_build_tools_zip():
     if OPTIONS_MANAGER.register_script_file_obj is not None:
         count += 1
     head_list = get_tools_head_list(count)
-    component_list, num = \
-        get_tools_component_list(count, opera_script_dict)
+    component_list, num = get_tools_component_list(count, opera_script_dict)
     total_script_file_obj = OPTIONS_MANAGER.total_script_file_obj
     register_script_file_obj = OPTIONS_MANAGER.register_script_file_obj
     update_exe_path = os.path.join(OPTIONS_MANAGER.target_package_dir, UPDATE_EXE_FILE_NAME)
-    if not os.path.exists(update_exe_path):
-        UPDATE_LOGGER.print_log(
-            "updater_binary file does not exist!path: %s" % update_exe_path,
-            log_type=UPDATE_LOGGER.ERROR_LOG)
-        return False
 
     file_obj = tempfile.NamedTemporaryFile(dir=OPTIONS_MANAGER.update_package, prefix="build_tools-")
     files_to_sign = []
@@ -346,10 +349,15 @@ def create_build_tools_zip():
     for key, value in opera_script_dict.items():
         zip_file.write(key, value)
         files_to_sign += [(key, name_format_str.format(value))]
-
-    # add update_binary to build_tools.zip
-    zip_file.write(update_exe_path, UPDATE_EXE_FILE_NAME)
-    files_to_sign += [(update_exe_path, name_format_str.format(UPDATE_EXE_FILE_NAME))]
+    binary_check = OPTIONS_MANAGER.init.invoke_event(CHECK_BINARY_EVENT)
+    if callable(binary_check) is False or (callable(binary_check) and binary_check() is False):
+        if not os.path.exists(update_exe_path):
+            UPDATE_LOGGER.print_log("updater_binary file does not exist!path: %s" % update_exe_path,
+                log_type=UPDATE_LOGGER.ERROR_LOG)
+            return False
+        # add update_binary to build_tools.zip
+        zip_file.write(update_exe_path, UPDATE_EXE_FILE_NAME)
+        files_to_sign += [(update_exe_path, name_format_str.format(UPDATE_EXE_FILE_NAME))]
 
     # add loadScript to build_tools.zip
     zip_file.write(total_script_file_obj.name, TOTAL_SCRIPT_FILE_NAME)
@@ -359,7 +367,9 @@ def create_build_tools_zip():
         files_to_sign += [(register_script_file_obj.name, name_format_str.format(REGISTER_SCRIPT_FILE_NAME))]
 
     if create_hsd_for_build_tools(zip_file, files_to_sign) is False:
+        zip_file.close()
         return False
+    zip_file.close()
     return file_obj
 
 
@@ -397,13 +407,21 @@ def get_update_file_name():
 def do_zip_update_package():
     zip_file = zipfile.ZipFile(OPTIONS_MANAGER.update_package_file_path,
                                'w', zipfile.ZIP_DEFLATED, allowZip64=True)
+    # add files to update package
+    do_add_files = OPTIONS_MANAGER.init.invoke_event(ZIP_EVENT)
+    if callable(do_add_files) and do_add_files(zip_file) is False:
+        UPDATE_LOGGER.print_log("add files fail", UPDATE_LOGGER.ERROR_LOG)
+        zip_file.close()
+        return False
     # add update.bin to update package
     zip_file.write(OPTIONS_MANAGER.update_bin_obj.name, "update.bin")
     # add build_tools.zip to update package
     zip_file.write(OPTIONS_MANAGER.build_tools_zip_obj.name, BUILD_TOOLS_FILE_NAME)
 
-    zip_file.write(OPTIONS_MANAGER.version_mbn_file_path, "version_list")
     zip_file.write(OPTIONS_MANAGER.board_list_file_path, "board_list")
+    decouple_res = OPTIONS_MANAGER.init.invoke_event(DECOUPLED_EVENT)
+    if decouple_res is False:
+        zip_file.write(OPTIONS_MANAGER.version_mbn_file_path, "version_list")
 
     if OPTIONS_MANAGER.max_stash_size != 0:
         max_stash_file_obj = tempfile.NamedTemporaryFile(mode="w+")
@@ -437,7 +455,6 @@ def create_hsd_for_build_tools(zip_file, files_to_sign):
         zip_file.close()
         return False
     zip_file.writestr("hash_signed_data", signed_data)
-    zip_file.close()
     return True
 
 
@@ -460,7 +477,7 @@ def build_update_package(no_zip, update_package, prelude_script,
         return False
 
     update_file_name = get_update_file_name()
- 
+
     if not no_zip:
         update_package_path = os.path.join(
             update_package, '%s_unsigned.zip' % update_file_name)
