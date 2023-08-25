@@ -32,6 +32,45 @@ from script_generator import EndingScript
 from update_package import build_update_package
 from update_package import get_component_list
 
+def fail_test_case_1():
+    OPTIONS_MANAGER.hash_algorithm = 'sha256'
+    OPTIONS_MANAGER.target_package_config_dir = \
+        "./test_target_package/updater_config"
+    OPTIONS_MANAGER.target_package_dir = \
+        "./test_target_package/"
+    with open(VERSION_MBN_PATH) as om_second_f:
+        OPTIONS_MANAGER.total_script_file_obj = om_second_f
+    OPTIONS_MANAGER.full_img_list = []
+    OPTIONS_MANAGER.opera_script_file_name_dic = {}
+    OPTIONS_MANAGER.private_key = "../"
+    OPTIONS_MANAGER.product = 'Hi3516'
+    prelude_script = PreludeScript()
+    verse_script = VerseScript()
+    refrain_script = RefrainScript()
+    ending_script = EndingScript()
+    check_re = build_update_package(
+        False, 'test_dir', prelude_script, verse_script,
+        refrain_script, ending_script)
+    return check_re
+
+
+def fail_test_case_2():
+    OPTIONS_MANAGER.hash_algorithm = 'sha256'
+    OPTIONS_MANAGER.target_package_config_dir = ""
+    OPTIONS_MANAGER.target_package_dir = \
+        "./test_target_package/"
+    with open(VERSION_MBN_PATH) as om_third_f:
+        OPTIONS_MANAGER.total_script_file_obj = om_third_f
+    OPTIONS_MANAGER.full_img_list = []
+    OPTIONS_MANAGER.opera_script_file_name_dic = {}
+    OPTIONS_MANAGER.private_key = "../"
+    OPTIONS_MANAGER.product = 'Hi3516'
+    verse_script = VerseScript()
+    check_re = build_update_package(
+        False, 'test_dir', prelude_script, verse_script,
+        refrain_script, ending_script)
+    return check_re
+
 
 class TestUpdatePackage(unittest.TestCase):
 
@@ -74,40 +113,10 @@ class TestUpdatePackage(unittest.TestCase):
         create_input_package(
             "test_target_package", package_type="source")
 
-        OPTIONS_MANAGER.hash_algorithm = 'sha256'
-        OPTIONS_MANAGER.target_package_config_dir = \
-            "./test_target_package/updater_config"
-        OPTIONS_MANAGER.target_package_dir = \
-            "./test_target_package/"
-        with open(VERSION_MBN_PATH) as om_second_f:
-            OPTIONS_MANAGER.total_script_file_obj = om_second_f
-        OPTIONS_MANAGER.full_img_list = []
-        OPTIONS_MANAGER.opera_script_file_name_dic = {}
-        OPTIONS_MANAGER.private_key = "../"
-        OPTIONS_MANAGER.product = 'Hi3516'
-        prelude_script = PreludeScript()
-        verse_script = VerseScript()
-        refrain_script = RefrainScript()
-        ending_script = EndingScript()
-        check_re = build_update_package(
-            False, 'test_dir', prelude_script, verse_script,
-            refrain_script, ending_script)
+        check_re = fail_test_case_1()
         self.assertEqual(check_re, False)
 
-        OPTIONS_MANAGER.hash_algorithm = 'sha256'
-        OPTIONS_MANAGER.target_package_config_dir = ""
-        OPTIONS_MANAGER.target_package_dir = \
-            "./test_target_package/"
-        with open(VERSION_MBN_PATH) as om_third_f:
-            OPTIONS_MANAGER.total_script_file_obj = om_third_f
-        OPTIONS_MANAGER.full_img_list = []
-        OPTIONS_MANAGER.opera_script_file_name_dic = {}
-        OPTIONS_MANAGER.private_key = "../"
-        OPTIONS_MANAGER.product = 'Hi3516'
-        verse_script = VerseScript()
-        check_re = build_update_package(
-            False, 'test_dir', prelude_script, verse_script,
-            refrain_script, ending_script)
+        check_re = fail_test_case_2()
         self.assertEqual(check_re, False)
 
         if os.path.exists(VERSION_MBN_PATH):
