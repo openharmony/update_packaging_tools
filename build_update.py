@@ -659,8 +659,7 @@ def increment_image_processing(
 
         graph_process = GigraphProcess(actions_list, src_image_class, tgt_image_class)
         actions_list = graph_process.actions_list
-        patch_process = \
-            patch_package_process.PatchProcess(each_img, tgt_image_class, src_image_class, actions_list)
+        patch_process = patch_package_process.PatchProcess(each_img, tgt_image_class, src_image_class, actions_list)
         patch_process.patch_process()
         patch_process.write_script(each_img, script_check_cmd_list, script_write_cmd_list, verse_script)
         OPTIONS_MANAGER.incremental_block_file_obj_dict[each_img] = patch_process.package_patch_zip
