@@ -92,8 +92,7 @@ def create_input_package(
         os.mkdir(package_name_path)
 
     if not is_miss_image:
-        create_file(os.path.join(package_name_path, "system.img"),
-                    get_target_vendor_data())
+        create_file(os.path.join(package_name_path, "system.img"), get_target_vendor_data())
 
     # Judge the type of input package and generate the corresponding vendor.img
     if package_type == "target":
@@ -104,56 +103,41 @@ def create_input_package(
         print("Unknown package type!")
         raise RuntimeError
     if not is_miss_image:
-        create_file(os.path.join(package_name_path, "vendor.img"),
-                    vendor_content)
+        create_file(os.path.join(package_name_path, "vendor.img"), vendor_content)
     if not is_miss_updater_binary:
-        create_file(os.path.join(package_name_path, "updater_binary"),
-                    UPDATER_BINARY_DATA)
+        create_file(os.path.join(package_name_path, "updater_binary"), UPDATER_BINARY_DATA)
     # updater upgrade package
     if is_su:
-        create_file(os.path.join(package_name_path, "uImage"),
-                    get_target_vendor_data())
-        create_file(os.path.join(package_name_path, "updater.img"),
-                    get_target_vendor_data())
-        create_file(os.path.join(package_name_path, "updater_b.img"),
-                    get_target_vendor_data())
-        create_file(os.path.join(package_name_path, "updater_uImage"),
-                    get_target_vendor_data())
+        create_file(os.path.join(package_name_path, "uImage"), get_target_vendor_data())
+        create_file(os.path.join(package_name_path, "updater.img"), get_target_vendor_data())
+        create_file(os.path.join(package_name_path, "updater_b.img"), get_target_vendor_data())
+        create_file(os.path.join(package_name_path, "updater_uImage"), get_target_vendor_data())
     # Create updater_config dir.
     updater_config_path = "./%s/updater_config" % package_name
     if not os.path.exists(updater_config_path):
         os.mkdir(updater_config_path)
-    create_file(os.path.join(updater_config_path, "BOARD.list"),
-                BOARD_LIST_DATA)
+    create_file(os.path.join(updater_config_path, "BOARD.list"), BOARD_LIST_DATA)
     if not is_miss_version_list:
-        create_file(os.path.join(updater_config_path, "VERSION.mbn"),
-                    VERSION_MBN_DATA)
+        create_file(os.path.join(updater_config_path, "VERSION.mbn"), VERSION_MBN_DATA)
     # Judge the type of input package and
     xml_content = \
-        create_updater_specified_config_file(
-            has_userdata, is_updater_partitions, package_type)
+        create_updater_specified_config_file(has_userdata, is_updater_partitions, package_type)
 
     if is_inc_full_none:
         xml_content = xml_content.replace("SYSTEM_MARK", "")
-        xml_content = xml_content.replace(
-            "COMPONENT_MARK", "").encode()
+        xml_content = xml_content.replace("COMPONENT_MARK", "").encode()
     else:
-        xml_content = xml_content.replace(
-            "SYSTEM_MARK", SYSTEM_COMPONENT_STR)
-        xml_content = xml_content.replace(
-            "COMPONENT_MARK", COMPONENT_STR_FULL).encode()
+        xml_content = xml_content.replace("SYSTEM_MARK", SYSTEM_COMPONENT_STR)
+        xml_content = xml_content.replace("COMPONENT_MARK", COMPONENT_STR_FULL).encode()
 
-    create_file(
-        os.path.join(updater_config_path, "updater_specified_config.xml"),
-        xml_content)
+    create_file(os.path.join(updater_config_path, "updater_specified_config.xml"), xml_content)
     # Create partition_file.xml.
     if is_updater_partitions:
         create_file("./partition_file.xml", UPDATER_PARTITIONS_XML_DATA)
     # Create rsa_private_key2048.pem.
     create_file("./rsa_private_key2048.pem", RSA_PRIVATE_KEY_DATA)
     # Create zip package.
-    with zipfile.ZipFile('./%s.zip' % package_name,
-                         'w', zipfile.ZIP_DEFLATED) as package_zip:
+    with zipfile.ZipFile('./%s.zip' % package_name, 'w', zipfile.ZIP_DEFLATED) as package_zip:
         package_zip.write(package_name_path)
         for home, dirs, files in os.walk(package_name_path):
             for each_file_name in files:

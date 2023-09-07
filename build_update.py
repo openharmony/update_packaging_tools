@@ -623,8 +623,7 @@ def increment_image_processing(
         check_make_map_path(each_img)
 
         if filecmp.cmp(each_src_image_path, each_tgt_image_path):
-            UPDATE_LOGGER.print_log(
-                "Source Image is the same as Target Image! src image path: %s, tgt image path: %s"
+            UPDATE_LOGGER.print_log("Source Image is the same as Target Image! src image path: %s, tgt image path: %s"
                 % (each_src_image_path, each_tgt_image_path), UPDATE_LOGGER.INFO_LOG)
             OPTIONS_MANAGER.incremental_img_list.remove(each_img)
             continue
@@ -632,12 +631,10 @@ def increment_image_processing(
         src_generate_map = True
         tgt_generate_map = True
         if not os.path.exists(each_src_map_path):
-            src_generate_map = generate_image_map_file(each_src_image_path,
-                                    each_src_map_path, each_img)
+            src_generate_map = generate_image_map_file(each_src_image_path, each_src_map_path, each_img)
 
         if not os.path.exists(each_tgt_map_path):
-            tgt_generate_map = generate_image_map_file(each_tgt_image_path,
-                                    each_tgt_map_path, each_img)
+            tgt_generate_map = generate_image_map_file(each_tgt_image_path, each_tgt_map_path, each_img)
 
         if not src_generate_map or not tgt_generate_map:
             if increment_image_diff_processing(each_img, each_src_image_path, each_tgt_image_path,
@@ -662,8 +659,7 @@ def increment_image_processing(
 
         graph_process = GigraphProcess(actions_list, src_image_class, tgt_image_class)
         actions_list = graph_process.actions_list
-        patch_process = \
-            patch_package_process.PatchProcess(each_img, tgt_image_class, src_image_class, actions_list)
+        patch_process = patch_package_process.PatchProcess(each_img, tgt_image_class, src_image_class, actions_list)
         patch_process.patch_process()
         patch_process.write_script(each_img, script_check_cmd_list, script_write_cmd_list, verse_script)
         OPTIONS_MANAGER.incremental_block_file_obj_dict[each_img] = patch_process.package_patch_zip
