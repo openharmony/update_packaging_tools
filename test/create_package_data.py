@@ -125,10 +125,10 @@ def create_input_package(
 
     if is_inc_full_none:
         xml_content = xml_content.replace("SYSTEM_MARK", "")
-        xml_content = xml_content.replace("COMPONENT_MARK", "").encode()
+        xml_content = xml_content.replace("COMPONENT_MARK", "")
     else:
         xml_content = xml_content.replace("SYSTEM_MARK", SYSTEM_COMPONENT_STR)
-        xml_content = xml_content.replace("COMPONENT_MARK", COMPONENT_STR_FULL).encode()
+        xml_content = xml_content.replace("COMPONENT_MARK", COMPONENT_STR_FULL)
 
     create_file(os.path.join(updater_config_path, "updater_specified_config.xml"), xml_content)
     # Create partition_file.xml.
