@@ -62,7 +62,9 @@ Note:If the text contains special characters, please escape them according to th
                 <!--policyitem type="compatibility" name="curl" path=".*" rule="may" group="defaultGroup" filefilter="defaultPolicyFilter" desc=""/-->			
                 <!--policyitem type="compatibility" name="GPL-2.0+" path=".*" desc="不使用或者使用但是是独立进程，被X进程调用，自研进程不受GPL影响"/>			
                 <policyitem type="license" name="LGPL" path=".*" desc="未使用，或者使用了，被X进程以动态链接方式调用"/>
-                <policyitem type="copyright" name="xxx" path=".*" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc="xxxx开发代码"/-->		        
+                <policyitem type="copyright" name="xxx" path=".*" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc="xxxx开发代码"/-->
+                <policyitem type="license" name="*" path="test/.*" rule="may" group="defaultGroup" filefilter="defaultPolicyFilter" desc="测试资源文件"/>
+                <policyitem type="copyright" name="*" path="test/.*" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc="测试资源文件"/>	        
             </policy>
         </policylist>
 		<filefilterlist>			
