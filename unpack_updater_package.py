@@ -25,7 +25,6 @@ from create_update_package import UPGRADE_COMPINFO_SIZE_L2
 from create_update_package import COMPONENT_ADDR_SIZE
 from create_update_package import COMPONENT_ADDR_SIZE_L2
 from create_update_package import UPGRADE_RESERVE_LEN
-from create_update_package import UPGRADE_SIGNATURE_LEN
 
 from create_hashdata import HASH_TYPE_SIZE
 from create_hashdata import HASH_LENGTH_SIZE
@@ -98,11 +97,32 @@ class UnpackPackage(object):
             return False
 
         self.count = compinfo_len[0] // self.compinfo_size
-        self.component_offset = \
-            UPGRADE_FILE_HEADER_LEN + compinfo_len[0] + \
-            UPGRADE_RESERVE_LEN + UPGRADE_SIGNATURE_LEN
-        UPDATE_LOGGER.print_log(
-                    "parse package file success! components: %d" % self.count)
+        self.component_offset = UPGRADE_FILE_HEADER_LEN + compinfo_len[0] + UPGRADE_RESERVE_LEN
+
+        try:
+            package_file.seek(self.component_offset)
+            next_tlv_type_buffer = package_file.read(HASH_TYPE_SIZE)
+            next_tlv_type = struct.unpack(COMPINFO_LEN_FMT, next_tlv_type_buffer)
+            if next_tlv_type[0] == 0x06:
+                UPDATE_LOGGER.print_log("parse update.bin in SDcard package")
+                self.component_offset += HASH_TLV_SIZE + UPGRADE_HASHINFO_SIZE + HASH_TYPE_SIZE
+                package_file.seek(self.component_offset)
+                hashdata_len_buffer = package_file.read(HASH_LENGTH_SIZE)
+                hashdata_len = struct.unpack(COMPONENT_SIZE_FMT, hashdata_len_buffer)
+                self.component_offset += HASH_LENGTH_SIZE + hashdata_len[0] + HASH_TYPE_SIZE
+            elif next_tlv_type[0] == 0x08:
+                self.component_offset += HASH_TYPE_SIZE
+
+            package_file.seek(self.component_offset)
+            sign_len_buffer = package_file.read(HASH_LENGTH_SIZE)
+            sign_len = struct.unpack(COMPONENT_SIZE_FMT, sign_len_buffer)
+            UPDATE_LOGGER.print_log(
+                "signdata offset:%d length:%d" % (self.component_offset + HASH_LENGTH_SIZE, sign_len[0]))
+            self.component_offset += HASH_LENGTH_SIZE + sign_len[0]
+        except (struct.error, IOError):
+            return False
+
+        UPDATE_LOGGER.print_log("parse package file success! components: %d" % self.count)
         return True
 
     def parse_component(self, package_file):
@@ -128,9 +148,8 @@ class UnpackPackage(object):
     def create_image_file(self, package_file):
         component_name, component_type, component_size = \
             self.parse_component(package_file)
-        if component_name is None and component_type is None and component_size is None:
-            UPDATE_LOGGER.print_log(
-                "get component_info failed!", UPDATE_LOGGER.ERROR_LOG)
+        if component_name is None or component_type is None or component_size is None:
+            UPDATE_LOGGER.print_log("get component_info failed!", UPDATE_LOGGER.ERROR_LOG)
             return False
         component_name = component_name.strip('/')
         if component_name == "version_list":
