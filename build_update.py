@@ -83,6 +83,8 @@ from utils import DIFF_EXE_PATH
 from utils import PARTITION_CHANGE_EVENT
 from utils import DECOUPLED_EVENT
 from utils import get_update_config_softversion
+from utils import SPARSE_IMAGE_MAGIC
+from utils import SPARSE_IMAGE_MAGIC_LEN
 from vendor_script import create_vendor_script_class
 
 sys.setrecursionlimit(MAXIMUM_RECURSION_DEPTH)
@@ -485,18 +487,21 @@ def generate_image_map_file(image_path, map_path, image_name):
             image_name, UPDATE_LOGGER.ERROR_LOG)
         return False
 
-    cmd = \
-        [E2FSDROID_PATH, "-B", map_path, "-a", "/%s" % image_name, image_path, "-e"]
-
-    sub_p = subprocess.Popen(
-            cmd, shell=False, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT)
-    sub_p.wait()
-
-    if not os.path.exists(map_path):
-        UPDATE_LOGGER.print_log("%s generate image map file failed."
-                                % image_path)
-        return False
+    with open(image_path, 'rb') as f_r:
+        image_magic_info = f_r.read(SPARSE_IMAGE_MAGIC_LEN)
+        magic_number = int.from_bytes(image_magic_info, byteorder='little')
+        if magic_number == SPARSE_IMAGE_MAGIC:
+            cmd = [E2FSDROID_PATH, "-B", map_path, "-a", "/%s" % image_name, image_path]
+        else:
+            cmd = [E2FSDROID_PATH, "-B", map_path, "-a", "/%s" % image_name, image_path, "-e"]
+ 
+    res = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    _, err = res.communicate(timeout=300)
+    if res.returncode != 0:
+        UPDATE_LOGGER.print_log("%s.map generate failed, reason:%s" %
+                                (image_name, err.decode()), UPDATE_LOGGER.ERROR_LOG)
+        raise RuntimeError
+    UPDATE_LOGGER.print_log("%s.map generate success" % image_name, UPDATE_LOGGER.INFO_LOG)
     return True
 
 
@@ -644,14 +649,13 @@ def increment_image_processing(
             clear_resource(err_clear=True)
             return False
 
-        src_image_class = IncUpdateImage(each_src_image_path, each_src_map_path)
-        tgt_image_class = IncUpdateImage(each_tgt_image_path, each_tgt_map_path)
-        OPTIONS_MANAGER.src_image = src_image_class
-        OPTIONS_MANAGER.tgt_image = tgt_image_class
-
         inc_image = OPTIONS_MANAGER.init.invoke_event(INC_IMAGE_EVENT)
         if inc_image:
-            src_image_class, tgt_image_class = inc_image()
+            src_image_class, tgt_image_class = inc_image(each_src_image_path, each_src_map_path,
+                                                         each_tgt_image_path, each_tgt_map_path)
+        else:
+            src_image_class = IncUpdateImage(each_src_image_path, each_src_map_path)
+            tgt_image_class = IncUpdateImage(each_tgt_image_path, each_tgt_map_path)
 
         transfers_manager = TransfersManager(each_img, tgt_image_class, src_image_class)
         transfers_manager.find_process_needs()

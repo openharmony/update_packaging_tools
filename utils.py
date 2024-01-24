@@ -90,6 +90,8 @@ FORBIDEN_UPDATE_IMAGE_SET = {"ptable"}
 
 # 1000000: max number of function recursion depth
 MAXIMUM_RECURSION_DEPTH = 1000000
+SPARSE_IMAGE_MAGIC = 0xED26FF3A
+SPARSE_IMAGE_MAGIC_LEN = 4
 
 
 def singleton(cls):
@@ -199,8 +201,6 @@ class OptionsManager(BaseOptionsManager):
         self.incremental_block_file_obj_dict = {}
         self.incremental_temp_file_obj_list = []
         self.max_stash_size = 0
-        self.src_image = None
-        self.tgt_image = None
 
         # Script parameters
         self.opera_script_file_name_dict = {}
