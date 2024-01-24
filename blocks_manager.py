@@ -27,12 +27,6 @@ class BlocksManager(object):
     def __init__(self, range_data=None):
         self.monotonic = False
         if isinstance(range_data, str):
-            tmp_range = []
-            if range_data != "0":
-                for i in range_data.split():
-                    if i != "0":
-                        tmp_range.append(i) 
-                range_data = ' '.join(tmp_range)
             self.__parse_data_text(range_data)
         elif range_data:
             if len(range_data) % 2 != 0:
