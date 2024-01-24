@@ -90,8 +90,6 @@ FORBIDEN_UPDATE_IMAGE_SET = {"ptable"}
 
 # 1000000: max number of function recursion depth
 MAXIMUM_RECURSION_DEPTH = 1000000
-SPARSE_IMAGE_MAGIC = 0xED26FF3A
-SPARSE_IMAGE_MAGIC_LEN = 4
 
 
 def singleton(cls):

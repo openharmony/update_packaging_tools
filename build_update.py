@@ -487,20 +487,13 @@ def generate_image_map_file(image_path, map_path, image_name):
             image_name, UPDATE_LOGGER.ERROR_LOG)
         return False
 
-    with open(image_path, 'rb') as f_r:
-        image_magic_info = f_r.read(SPARSE_IMAGE_MAGIC_LEN)
-        magic_number = int.from_bytes(image_magic_info, byteorder='little')
-        if magic_number == SPARSE_IMAGE_MAGIC:
-            cmd = [E2FSDROID_PATH, "-B", map_path, "-a", "/%s" % image_name, image_path]
-        else:
-            cmd = [E2FSDROID_PATH, "-B", map_path, "-a", "/%s" % image_name, image_path, "-e"]
- 
+    cmd = [E2FSDROID_PATH, "-B", map_path, "-a", "/%s" % image_name, image_path, "-e"]
     res = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     _, err = res.communicate(timeout=300)
     if res.returncode != 0:
         UPDATE_LOGGER.print_log("%s.map generate failed, reason:%s" %
                                 (image_name, err.decode()), UPDATE_LOGGER.ERROR_LOG)
-        raise RuntimeError
+        return False
     UPDATE_LOGGER.print_log("%s.map generate success" % image_name, UPDATE_LOGGER.INFO_LOG)
     return True
 
