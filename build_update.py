@@ -83,8 +83,6 @@ from utils import DIFF_EXE_PATH
 from utils import PARTITION_CHANGE_EVENT
 from utils import DECOUPLED_EVENT
 from utils import get_update_config_softversion
-from utils import SPARSE_IMAGE_MAGIC
-from utils import SPARSE_IMAGE_MAGIC_LEN
 from vendor_script import create_vendor_script_class
 
 sys.setrecursionlimit(MAXIMUM_RECURSION_DEPTH)
