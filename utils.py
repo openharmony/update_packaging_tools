@@ -199,8 +199,6 @@ class OptionsManager(BaseOptionsManager):
         self.incremental_block_file_obj_dict = {}
         self.incremental_temp_file_obj_list = []
         self.max_stash_size = 0
-        self.src_image = None
-        self.tgt_image = None
 
         # Script parameters
         self.opera_script_file_name_dict = {}

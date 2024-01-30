@@ -184,11 +184,12 @@ class IncUpdateImage:
             for each_line in f_r.readlines():
                 each_map_path, ranges_value = each_line.split(None, 1)
                 each_range = BlocksManager(ranges_value)
+                each_range = each_range.get_subtract_with_other(BlocksManager("0"))
+                # each_range may not contained in the remain range.
+                intersect_range = each_range.get_intersect_with_other(remain_range)
+                if each_range.size() != intersect_range.size():
+                    each_range = intersect_range
                 temp_file_map[each_map_path] = each_range
-                # each_range is contained in the remain range.
-                if each_range.size() != each_range. \
-                        get_intersect_with_other(remain_range).size():
-                    raise RuntimeError
                 # After the processing is complete,
                 # remove each_range from remain_range.
                 remain_range = remain_range.get_subtract_with_other(each_range)
