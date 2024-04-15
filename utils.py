@@ -238,7 +238,8 @@ def unzip_package(package_path, origin='target'):
             else:
                 ext_filename = os.path.join(
                     tmp_dir, name)
-                with open(ext_filename, 'wb') as f_w:
+                fd = os.open(ext_filename, os.O_RDWR | os.O_CREAT, 0o755)
+                with os.fdopen(fd, "wb") as f_w:
                     f_w.write(zf_obj.read(name))
     except OSError:
         UPDATE_LOGGER.print_log(
