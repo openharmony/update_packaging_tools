@@ -11,10 +11,10 @@
     "scripts": {},
     "component": {
         "name": "packaging_tools",
-        "subsystem": "update",
+        "subsystem": "updater",
         "syscap": [],
         "features": [],
-        "adapted_system_type": [ "mini,small,standard" ],
+        "adapted_system_type": [ "standard" ],
         "rom": "",
         "ram": "",
         "deps": {
