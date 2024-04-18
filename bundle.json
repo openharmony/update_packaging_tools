@@ -1,0 +1,30 @@
+{
+    "name": "@ohos/packaging_tools",
+    "description": "升级包制作工具是用于制作升级包的工具，功能主要包括：全量升级包制作、差分升级包制作以及变分区升级包制作。",
+    "version": "1.1",
+    "license": "BSD 2-Clause",
+    "publishAs": "code-segment",
+    "segment": {
+        "destPath": "base/update/packaging_tools"
+    },
+    "dirs": {},
+    "scripts": {},
+    "component": {
+        "name": "packaging_tools",
+        "subsystem": "updater",
+        "syscap": [],
+        "features": [],
+        "adapted_system_type": [ "mini", "small", "standard" ],
+        "rom": "0",
+        "ram": "0",
+        "deps": {
+            "components": [],
+            "third_party": []
+        },
+        "build": {
+            "sub_component": [],
+            "inner_kits": [],
+            "test": []
+        }
+    }
+}
