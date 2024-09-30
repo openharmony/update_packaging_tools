@@ -58,6 +58,7 @@ HASH_INFO_FMT = "<3HI"
 HASH_DATA_HEADER_FMT = "<32sHI"
 HASH_DATA_ADDR_FMT = "<2I"
 
+
 class CreateHash(object):
     """
     Create the component hash data
@@ -128,7 +129,7 @@ class CreateHash(object):
                 component_len = os.path.getsize(component.file_path)
                 block_num = component_len // HASH_BLOCK_SIZE
                 component_name = component.component_addr.decode().ljust(COMPONENT_NAME_SIZE, "\0")
-                UPDATE_LOGGER.print_log("calc component hash  component name:%s %d" % (component_name,len(component_name)))
+                UPDATE_LOGGER.print_log("calc component hash  component name:%s %d" % (component_name, len(component_name)))
                 total_block = block_num + 1 if component_len % HASH_BLOCK_SIZE > 0 else block_num
                 self.hashdata += struct.pack(HASH_DATA_HEADER_FMT, component_name.encode(),
                     total_block, component_len)
