@@ -112,9 +112,9 @@ class ExtInit:
         self.funs = []
 
     def reg_event(self, evevt_id, funs):
-            self.funs.append([evevt_id, funs])
-            UPDATE_LOGGER.print_log(
-                'register event %s: %s' % (evevt_id, funs.__name__))
+        self.funs.append([evevt_id, funs])
+        UPDATE_LOGGER.print_log(
+            'register event %s: %s' % (evevt_id, funs.__name__))
 
     def invoke_event(self, evevt_id):
         UPDATE_LOGGER.print_log(self.funs)
