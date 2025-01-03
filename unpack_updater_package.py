@@ -25,6 +25,7 @@ from create_update_package import UPGRADE_COMPINFO_SIZE_L2
 from create_update_package import COMPONENT_ADDR_SIZE
 from create_update_package import COMPONENT_ADDR_SIZE_L2
 from create_update_package import UPGRADE_RESERVE_LEN
+from create_update_package import UPGRADE_SIGNATURE_LEN
 
 from create_hashdata import HASH_TYPE_SIZE
 from create_hashdata import HASH_LENGTH_SIZE

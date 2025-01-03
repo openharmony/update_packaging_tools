@@ -43,6 +43,8 @@ optional arguments:
                         supported by the tool include ['256', '384'].
   -xp, --xml_path       XML file path.
   -sc, --sd_card        SD Card mode, Create update package for SD Card.
+  -su, --stream_update  Stream update mode, Create update package for stream update.
+  -ab, --ab_partition_update  Ab partition update mode, Create update package for ab partition update.
 """
 import filecmp
 import os
@@ -53,6 +55,8 @@ import tempfile
 import hashlib
 import xmltodict
 import patch_package_process
+import math
+
 
 from gigraph_process import GigraphProcess
 from image_class import FullUpdateImage
@@ -84,6 +88,8 @@ from utils import PARTITION_CHANGE_EVENT
 from utils import DECOUPLED_EVENT
 from utils import get_update_config_softversion
 from vendor_script import create_vendor_script_class
+from create_chunk import CreateChunk
+from concurrent.futures import ThreadPoolExecutor
 
 sys.setrecursionlimit(MAXIMUM_RECURSION_DEPTH)
 
@@ -213,6 +219,12 @@ def create_entrance_args():
     parser.add_argument("-sc", "--sd_card", action='store_true',
                         help="SD Card mode, "
                              "Create update package for SD Card.")
+    parser.add_argument("-su", "--stream_update", action='store_true',
+                        help="Stream update mode, "
+                             "Create update package for stream update.")
+    parser.add_argument("-ab", "--ab_partition_update", action='store_true',
+                        help="Ab partition update mode, "
+                             "Create update package for ab partition update.")
 
 
 def parse_args():
@@ -229,6 +241,8 @@ def parse_args():
     OPTIONS_MANAGER.signing_length = int(args.signing_length)
     OPTIONS_MANAGER.xml_path = args.xml_path
     OPTIONS_MANAGER.sd_card = args.sd_card
+    OPTIONS_MANAGER.stream_update = args.stream_update
+    OPTIONS_MANAGER.ab_partition_update = args.ab_partition_update
 
 
 def get_args():
@@ -481,8 +495,8 @@ def generate_image_map_file(image_path, map_path, image_name):
     """
     if not os.path.exists(image_path):
         UPDATE_LOGGER.print_log("The source %s.img file is missing from the"
-            "source package, cannot be incrementally processed. ",
-            image_name, UPDATE_LOGGER.ERROR_LOG)
+            "source package, cannot be incrementally processed. "
+            % image_name, UPDATE_LOGGER.ERROR_LOG)
         return False
 
     cmd = [E2FSDROID_PATH, "-B", map_path, "-a", "/%s" % image_name, image_path, "-e"]
@@ -575,9 +589,58 @@ def increment_image_diff_processing(
     sub_p.wait()
     if sub_p.returncode != 0:
         raise ValueError(output)
+    
     return write_image_patch_script(partition, src_image_path, tgt_image_path,
         script_check_cmd_list, script_write_cmd_list, verse_script)
 
+
+def copy_in_ab_process(patch_process, src_image_class, need_copy_blocks,
+                       non_continuous_blocks, each_img):
+    """
+    Handle the process of copying blocks in an AB partition during an update.
+    :param patch_process: The patch process object responsible for managing the update.
+    :param src_image_class: The source image class containing metadata about the image.
+    :param need_copy_blocks: A list to store blocks that need to be copied.
+    :param non_continuous_blocks: A list to store blocks that are non-continuous.
+    :param each_img: The current image being processed.
+    :return:
+    """
+    if OPTIONS_MANAGER.ab_partition_update:
+        chunk_pkgdiff_list = patch_process.get_chunk_pkgdiff_list()
+        transfer_content = patch_process.get_transfer_content_in_chunk()
+        chunk_new_list = patch_process.get_chunk_new_list()
+
+        # Parase transfer_content, record all blocks involved in the content
+        no_copy_blocks_in_ab, transfer_content_no_startoffert = parse_transfer_content(transfer_content)
+        
+        # Find the blocks to copy, total blocks includeing zero, excluding total_blocks
+        no_copy_blocks_set = set(no_copy_blocks_in_ab)
+        
+        def process_block(src_block):
+            if src_block in no_copy_blocks_set:
+                return None, src_block  # Not to copy
+            return src_block, None  # To copy
+        with ThreadPoolExecutor() as executor:
+            results = executor.map(process_block, range(src_image_class.total_blocks))
+
+        for to_copy, not_to_copy in results:
+            if to_copy is not None:
+                need_copy_blocks.append(to_copy)
+            if not_to_copy is not None:
+                non_continuous_blocks.append(not_to_copy)
+        # Sort blocks consecutively
+        if len(need_copy_blocks):
+            group_numbers_list = group_numbers(need_copy_blocks)
+        else:
+            group_numbers_list = []
+            print(f'there is no copy blocks in image {each_img} !')
+        # Add the copy command for ab partition synchronization
+        transfer_content = patch_process.add_ab_copy_content(len(need_copy_blocks), 
+                                                        group_numbers_list, transfer_content_no_startoffert)
+        OPTIONS_MANAGER.image_transfer_dict_contents[each_img] = transfer_content
+        OPTIONS_MANAGER.image_patch_dic[each_img] = chunk_pkgdiff_list
+        OPTIONS_MANAGER.image_new_dic[each_img] = chunk_new_list
+                
 
 def add_incremental_command(verse_script, script_check_cmd_list, script_write_cmd_list):
     """
@@ -609,6 +672,7 @@ def increment_image_processing(
     script_check_cmd_list = []
     script_write_cmd_list = []
     patch_process = None
+    
     for each_img_name in OPTIONS_MANAGER.incremental_img_name_list:
         each_img = each_img_name[:-4]
         each_src_image_path = os.path.join(source_package_dir, '%s.img' % each_img)
@@ -616,30 +680,28 @@ def increment_image_processing(
         each_tgt_image_path = os.path.join(target_package_dir, '%s.img' % each_img)
         each_tgt_map_path = os.path.join(target_package_dir, '%s.map' % each_img)
 
+        # This will store tuples of (start, end, length) for continuous ranges
+        non_continuous_blocks = []
+        need_copy_blocks = []
         check_make_map_path(each_img)
 
-        if filecmp.cmp(each_src_image_path, each_tgt_image_path):
-            UPDATE_LOGGER.print_log("Source Image is the same as Target Image! src image path: %s, tgt image path: %s"
-                % (each_src_image_path, each_tgt_image_path), UPDATE_LOGGER.INFO_LOG)
-            OPTIONS_MANAGER.incremental_img_list.remove(each_img)
+        # Call the new function to process image maps
+        continue_processing, src_generate_map, tgt_generate_map = process_image_maps(
+            each_img, each_src_image_path, each_src_map_path, 
+            each_tgt_image_path, each_tgt_map_path)
+        if not continue_processing:
             continue
 
-        src_generate_map = True
-        tgt_generate_map = True
-        if not os.path.exists(each_src_map_path):
-            src_generate_map = generate_image_map_file(each_src_image_path, each_src_map_path, each_img)
-
-        if not os.path.exists(each_tgt_map_path):
-            tgt_generate_map = generate_image_map_file(each_tgt_image_path, each_tgt_map_path, each_img)
-
-        if not src_generate_map or not tgt_generate_map:
-            if increment_image_diff_processing(each_img, each_src_image_path, each_tgt_image_path,
-                script_check_cmd_list, script_write_cmd_list, verse_script) is True:
-                continue
-            UPDATE_LOGGER.print_log("increment_image_diff_processing %s failed" % each_img)
-            clear_resource(err_clear=True)
+        # get the large of target image
+        if not get_large_of_target_image(each_tgt_image_path, each_img):
             return False
-
+        
+        if not src_generate_map or not tgt_generate_map:
+            if not handle_no_map_generation(each_img, each_src_image_path, each_tgt_image_path, \
+                script_check_cmd_list, script_write_cmd_list, verse_script):
+                return False
+            continue
+            
         inc_image = OPTIONS_MANAGER.init.invoke_event(INC_IMAGE_EVENT)
         if inc_image:
             src_image_class, tgt_image_class = inc_image(each_src_image_path, each_src_map_path,
@@ -651,22 +713,117 @@ def increment_image_processing(
         transfers_manager = TransfersManager(each_img, tgt_image_class, src_image_class)
         transfers_manager.find_process_needs()
         actions_list = transfers_manager.get_action_list()
-
+            
         graph_process = GigraphProcess(actions_list, src_image_class, tgt_image_class)
+        # Streaming update does not need to handle stash and free commands
+        if not OPTIONS_MANAGER.ab_partition_update:
+            graph_process.stash_process()
+
         actions_list = graph_process.actions_list
         patch_process = patch_package_process.PatchProcess(each_img, tgt_image_class, src_image_class, actions_list)
-        patch_process.patch_process()
+                                                
+        patch_process.patch_process(each_tgt_image_path)
+        
+        # Add copy command for ab partition
+        copy_in_ab_process(patch_process, src_image_class, need_copy_blocks,
+                       non_continuous_blocks, each_img)
+            
         patch_process.write_script(each_img, script_check_cmd_list, script_write_cmd_list, verse_script)
         OPTIONS_MANAGER.incremental_block_file_obj_dict[each_img] = patch_process.package_patch_zip
-
-        if not check_patch_file(patch_process):
-            UPDATE_LOGGER.print_log('Verify the incremental result failed!', UPDATE_LOGGER.ERROR_LOG)
-            raise RuntimeError
+        if not OPTIONS_MANAGER.stream_update:
+            if not check_patch_file(patch_process):
+                UPDATE_LOGGER.print_log('Verify the incremental result failed!', UPDATE_LOGGER.ERROR_LOG)
+                raise RuntimeError
 
     add_incremental_command(verse_script, script_check_cmd_list, script_write_cmd_list)
     return True
 
 
+def get_large_of_target_image(each_tgt_image_path, each_img):
+    """
+    Reads the target image content and stores it in OPTIONS_MANAGER.diff_image_new_data.
+
+    :param each_tgt_image_path: The path to the target image.
+    :param each_img: The name of the image (without extension).
+    :return: True if successful, False otherwise.
+    """
+    try:
+        with open(each_tgt_image_path, 'rb') as f:
+            target_content = f.read()
+        OPTIONS_MANAGER.diff_image_new_data[each_img] = target_content
+        return True
+    except Exception as e:
+        print(f"Error reading target image {each_img}: {e}")
+        return False
+    
+
+def process_image_maps(each_img, each_src_image_path, each_src_map_path, 
+                       each_tgt_image_path, each_tgt_map_path):
+    """
+    Process source and target image maps for incremental updates.
+
+    :param each_img: The image name without extension
+    :param each_src_image_path: Path to the source image
+    :param each_src_map_path: Path to the source map
+    :param each_tgt_image_path: Path to the target image
+    :param each_tgt_map_path: Path to the target map
+    :return: A tuple (continue_processing, src_generate_map, tgt_generate_map)
+             - continue_processing: Whether to continue processing the current image
+             - src_generate_map: Whether the source map was successfully generated
+             - tgt_generate_map: Whether the target map was successfully generated
+    """
+    # Check if source and target images are identical
+    if filecmp.cmp(each_src_image_path, each_tgt_image_path):
+        UPDATE_LOGGER.print_log(
+            "Source Image is the same as Target Image! src image path: %s, tgt image path: %s"
+            % (each_src_image_path, each_tgt_image_path), 
+            UPDATE_LOGGER.INFO_LOG)
+        OPTIONS_MANAGER.incremental_img_list.remove(each_img)
+        return False, False, False  # Stop further processing for this image
+
+    # Initialize map generation flags
+    src_generate_map = True
+    tgt_generate_map = True
+
+    # Generate source map if it does not exist
+    if not os.path.exists(each_src_map_path):
+        src_generate_map = generate_image_map_file(each_src_image_path, each_src_map_path, each_img)
+
+    # Generate target map if it does not exist
+    if not os.path.exists(each_tgt_map_path):
+        tgt_generate_map = generate_image_map_file(each_tgt_image_path, each_tgt_map_path, each_img)
+
+    return True, src_generate_map, tgt_generate_map
+
+
+def handle_no_map_generation(each_img, each_src_image_path, each_tgt_image_path, script_check_cmd_list, script_write_cmd_list, verse_script):
+    if OPTIONS_MANAGER.stream_update:
+        print(f'do no map process:{each_img}')
+        OPTIONS_MANAGER.no_map_image_exist = True
+        OPTIONS_MANAGER.no_map_file_list.append(each_img)
+        # Directly cut the target image into new commands
+        if not os.path.exists(each_tgt_image_path):
+            UPDATE_LOGGER.print_log(
+            "The file is missing "
+            "from the target package, "
+            "the component: %s cannot be full update processed. " %
+            each_tgt_image_path)
+            return False
+        with open(each_tgt_image_path, 'rb') as f:
+            tartget_no_map_content = f.read()
+        chunk, block_sets = split_image_file(each_img, tartget_no_map_content)
+        OPTIONS_MANAGER.image_chunk[each_img] = chunk
+        OPTIONS_MANAGER.image_block_sets[each_img] = block_sets
+        return True
+    # If it is not a streaming update and cannot generate map file,directly diff the image
+    elif increment_image_diff_processing(each_img, each_src_image_path, each_tgt_image_path,
+        script_check_cmd_list, script_write_cmd_list, verse_script) is True:
+        return True
+    UPDATE_LOGGER.print_log("increment_image_diff_processing %s failed" % each_img)
+    clear_resource(err_clear=True)
+    return False
+    
+    
 def check_patch_file(patch_process):
     new_dat_file_obj, patch_dat_file_obj, transfer_list_file_obj = \
         patch_process.package_patch_zip.get_file_obj()
@@ -776,6 +933,183 @@ def unpack_package_processing():
         sys.exit(0)
 
 
+def group_numbers(arr):
+    """
+    Groups and sorts a list of consecutive numbers, returning a list of block ranges.
+    :param arr: A list of integers representing block numbers.
+    :return: A list of integers representing the start and end of each block range.
+    """
+    result = []
+    current_group = [arr[0]]
+    transfer_content_blocks = []
+    
+    for i in range(1, len(arr)):
+        if arr[i] == arr[i - 1] + 1:
+            current_group.append(arr[i])
+        else:
+            result.append({
+                'min': min(current_group),
+                'max': max(current_group),
+                'length': len(current_group)
+            })
+            transfer_content_blocks.append(min(current_group))
+            transfer_content_blocks.append(max(current_group) + 1)
+            
+            current_group = [arr[i]]
+    
+           
+    result.append({
+        'min': min(current_group),
+        'max': max(current_group),
+        'length': len(current_group)
+    })
+    transfer_content_blocks.append(min(current_group))
+    transfer_content_blocks.append(max(current_group) + 1)
+    
+    return transfer_content_blocks
+
+
+def parse_transfer_content(content):
+    """
+    Parses the transfer content to extract block information and modified lines.   
+    :param content: The string content to be parsed, typically containing block data.
+    :return: A tuple containing:
+             - all_blocks: A list of all extracted block numbers.
+             - modified_content: A modified version of the original content with adjustments made.
+    """
+    all_blocks = []
+    modified_lines = []
+    lines = content.splitlines()
+    for line in lines[4:]:
+        if 'pkgdiff' in line:
+            modified_line, blocks = handle_pkgdiff(line)
+            modified_lines.append(modified_line)           
+            all_blocks.extend(blocks)
+        elif 'zero' in line or 'erase' in line:
+            blocks = handle_zero_erase(line)
+            all_blocks.extend(blocks)
+            modified_lines.append(line)
+        elif 'move' in line or 'new' in line:
+            blocks = handle_move_new(line)
+            all_blocks.extend(blocks)
+            modified_lines.append(line)        
+        elif 'free' in line:
+            print('no add free cmd')
+            modified_lines.append(line)
+        else:
+            raise ValueError(f"no parse transfer_list info, got {lines}.")
+    modified_content = '\n'.join(lines[:4] + modified_lines)    
+    return all_blocks, modified_content
+
+
+def handle_pkgdiff(line):
+    """
+    Handles the 'pkgdiff' line type.
+    :param line: The line to process.
+    :return: A tuple containing the modified line and the list of blocks.
+    """
+    parts = line.replace(',', ' ').split()
+    # Change the start offset address of pkgdiff to all zeros
+    modified_line = line.replace(line.split()[1], '0', 1)
+    length = int(parts[5])
+    if length % 2 != 0:
+        raise ValueError(f"Length must be even, got {length}.")
+    # Extract the range values of a pair of blocks
+    pairs = list(map(int, parts[6:length + 6]))  
+    blocks = []
+    # List all blocks in a single pair of block range values
+    for i in range(0, len(pairs), 2):
+        start = pairs[i]
+        print(f'start:{start}')
+        end = pairs[i + 1]
+        print(f'end:{end}')
+        blocks.extend(range(start, end))
+        print(f'len(blocks):{len(blocks)}')
+    return modified_line, blocks
+
+
+def handle_zero_erase(line):
+    """
+    Handles the 'zero' or 'erase' line type.
+    :param line: The line to process.
+    :return: The list of blocks extracted from the line.
+    """
+    parts = line.replace(',', ' ').split()
+    length = int(parts[1])
+    print(f'lenght:{length}')
+    if length % 2 != 0:
+        raise ValueError(f"Length must be even, got {length}.")
+    pairs = list(map(int, parts[2:length + 2]))
+    blocks = []
+    for i in range(0, len(pairs), 2):
+        start = pairs[i]
+        print(f'start:{start}')
+        end = pairs[i + 1]
+        print(f'end:{end}')
+        blocks.extend(range(start, end))
+        print(f'len(blocks):{len(blocks)}')
+    return blocks
+
+
+def handle_move_new(line):
+    """
+    Handles the 'move' or 'new' line type.
+    :param line: The line to process.
+    :return: The list of blocks extracted from the line.
+    """
+    parts = line.replace(',', ' ').split()
+    length = int(parts[2])
+    print(f'lenght:{length}')
+    if length % 2 != 0:
+        raise ValueError(f"Length must be even, got {length}.")
+    pairs = list(map(int, parts[3:length + 3]))
+    blocks = []
+    for i in range(0, len(pairs), 2):
+        start = pairs[i]
+        print(f'start:{start}')
+        end = pairs[i + 1]
+        print(f'end:{end}')
+        blocks.extend(range(start, end))
+        print(f'len(blocks):{len(blocks)}')
+    return blocks
+
+
+def split_image_file(each_img, full_image_data):
+    """
+    Splits the full image data into smaller chunks.    
+    :param each_img: The image to be split (not used in the current implementation).
+    :param full_image_data: The complete image data to be split.
+    :return: A tuple containing two lists:
+             - chunks: A list of data chunks.
+             - block_sets: A list of corresponding block sets for each chunk.
+    """
+    # get the total block number of the image
+    total_blocks = math.ceil(len(full_image_data) / 4096)
+    print(f'total tgt blocks:{total_blocks}')
+    # step 1：get the total size of the image data
+    max_chunk_size = OPTIONS_MANAGER.chunk_limit * 4096
+    total_size = len(full_image_data)
+    print(f'total size:{total_size}')
+    chunks = []
+    block_sets = []
+    # step 2：cut the image data into fixed block size
+    num = math.ceil(total_size / max_chunk_size)
+    print(f'num:{num}')
+    for i in range(num):
+        start_index = i * max_chunk_size
+        end_index = min(start_index + max_chunk_size, total_size)  
+        chunk = full_image_data[start_index:end_index]
+    # step 3：record the corresponding block set
+        block_set = list(range(math.ceil(start_index / 4096), 
+                                math.ceil(end_index / 4096)))
+        chunks.append(chunk)
+        block_sets.append(block_set)
+        print(f"block {i + 1}: size = {len(chunk)} bytes, block sets = {block_set}")
+    print(f'total size:{total_size}')
+    print(f'total tgt blocks:{total_blocks}')
+    return chunks, block_sets
+  
+  
 create_entrance_args()
 
 
@@ -824,7 +1158,8 @@ def main():
         OPTIONS_MANAGER.partition_file_obj = partition_file_obj
         OPTIONS_MANAGER.full_img_list = partitions_list
         OPTIONS_MANAGER.full_image_path_list = partitions_file_path_list
-
+        
+    # Incremental processing
     if incremental_processing(no_zip, partition_file, source_package, verse_script) is False:
         clear_resource(err_clear=True)
         return
@@ -839,6 +1174,16 @@ def main():
         if full_image_content_len_list is False or full_image_file_obj_list is False:
             clear_resource(err_clear=True)
             return
+        # Full streaming process
+        if OPTIONS_MANAGER.stream_update:
+            for each_img_name in OPTIONS_MANAGER.full_img_name_list:
+                print(f'full streaming process! current image name is:{each_img_name}')
+                each_img = each_img_name[:-4]
+                chunks, block_sets = split_image_file(each_img, 
+                                                      OPTIONS_MANAGER.full_image_new_data[each_img])
+                OPTIONS_MANAGER.full_chunk[each_img] = chunks
+                OPTIONS_MANAGER.full_block_sets[each_img] = block_sets
+                             
         OPTIONS_MANAGER.full_image_content_len_list, OPTIONS_MANAGER.full_image_file_obj_list = \
             full_image_content_len_list, full_image_file_obj_list
 

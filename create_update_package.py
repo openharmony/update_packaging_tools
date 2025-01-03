@@ -25,6 +25,7 @@ from utils import OPTIONS_MANAGER
 from create_hashdata import HashType
 from create_hashdata import CreateHash
 from create_hashdata import HASH_BLOCK_SIZE
+from create_chunk import CreateChunk
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
@@ -52,6 +53,8 @@ HEADER_TLV_TYPE_L2 = 0x01
 # signature algorithm
 SIGN_ALGO_RSA = "SHA256withRSA"
 SIGN_ALGO_PSS = "SHA256withPSS"
+# chunkdata offset
+CHUNK_INFO_OFFSET = 262
 
 """
 Format
@@ -81,6 +84,12 @@ class CreatePackage(object):
         self.component_offset = 0
         self.sign_offset = 0
         self.hash_info_offset = 0
+        self.chunk_info_offset = 0
+        self.chunk_data_offset = 0
+        self.hash_write_start_offset = 0
+        self.hash_write_end_offset = 0
+        self.chunk_hash_offset = 0
+        self.chunk_sign_offset = 0
 
         if OPTIONS_MANAGER.not_l2:
             self.upgrade_compinfo_size = UPGRADE_COMPINFO_SIZE
@@ -303,7 +312,63 @@ class CreatePackage(object):
         UPDATE_LOGGER.print_log(
             ".bin package header signing success! SignOffset: %s" % self.hash_info_offset)
         return True
+        
+    def calculate_hash_all_image(self, package_file):
+        """
+        Calculate the SHA-256 hash for a specified range of data in the package file.
+        :param package_file: The file object representing the package from which to calculate the hash.
+        :return: The SHA-256 hash digest of the specified data range.
+        """
+        hash_sha256 = hashlib.sha256()
+        # 计算的hash从hash info head开始
+        remain_len = self.hash_write_end_offset - self.hash_write_start_offset + 1
+        print(f'remain_len:{remain_len}')
+        package_file.seek(self.hash_write_start_offset)
+        while remain_len > BLOCK_SIZE:
+            hash_sha256.update(package_file.read(BLOCK_SIZE))
+            remain_len -= BLOCK_SIZE
+        if remain_len > 0:
+            hash_sha256.update(package_file.read(remain_len))
+        return hash_sha256.digest()
+    
+    
+    def sign_all_imgae_hash(self, sign_algo, hash_check_data, package_file):
+        """
+        Sign the hash of all images using the specified signing algorithm.
+        :param sign_algo: The signing algorithm to use (e.g., RSA or PSS).
+        :param hash_check_data: An object that holds hash check data and methods to write signature data.
+        :param package_file: The file object representing the package where the signature will be written.
+        :return: True if signing is successful, False otherwise.
+        """
+        digest = self.calculate_hash_all_image(package_file)
+        if not digest:
+            UPDATE_LOGGER.print_log("calculate hash for all image hash failed",
+                log_type=UPDATE_LOGGER.ERROR_LOG)
+            return False
 
+        # sign all image hash
+        if sign_algo == SIGN_ALGO_RSA:
+            signature = self.sign_digest(digest)
+        elif sign_algo == SIGN_ALGO_PSS:
+            signature = self.sign_digest_with_pss(digest)
+        else:
+            UPDATE_LOGGER.print_log("invalid sign_algo!", log_type=UPDATE_LOGGER.ERROR_LOG)
+            return False
+        if not signature:
+            UPDATE_LOGGER.print_log("sign .bin package failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
+            return False
+        print(f'write signature:{signature}')
+        # 所有镜像hash（包括hash info head）的sign打包封装
+        hash_check_data.write_all_image_signdata(signature)
+        UPDATE_LOGGER.print_log(
+            "start write full image sign offset: %s" % self.chunk_sign_offset)
+        package_file.seek(self.chunk_sign_offset)
+        package_file.write(hash_check_data.signdata)
+        self.chunk_sign_offset += len(hash_check_data.signdata)
+        UPDATE_LOGGER.print_log(
+            ".bin package header signing success! SignOffset: %s" % self.chunk_sign_offset)
+        return True
+    
     def create_package(self):
         """
         Create the update.bin file
@@ -359,10 +424,139 @@ class CreatePackage(object):
                     return False
             self.sign_header(SIGN_ALGO_RSA, hash_check_data, package_file)
             self.component_offset = self.hash_info_offset
-            for i in range(0, self.head_list.entry_count):
-                if not self.write_component(self.component_list[i], package_file):
-                    UPDATE_LOGGER.print_log("write component failed: %s"
-                        % self.component_list[i].component_addr, UPDATE_LOGGER.ERROR_LOG)
+            if not OPTIONS_MANAGER.stream_update:
+                if not self.write_component_list(package_file):
                     return False
-        UPDATE_LOGGER.print_log("Write update package complete")
+            self.chunk_info_offset = self.component_offset  
+            
+            # Incremental streaming update
+            if OPTIONS_MANAGER.stream_update and OPTIONS_MANAGER.incremental_img_list:
+                try: 
+                    self.create_incremental_package(package_file)
+                    UPDATE_LOGGER.print_log("Write incremental streaming update chunk complete!",
+                                            log_type=UPDATE_LOGGER.INFO_LOG)
+                        
+                except IOError:
+                    UPDATE_LOGGER.print_log("Add Chunk data info failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
+                    return False
+                
+            # Full streaming update
+            if OPTIONS_MANAGER.stream_update and len(OPTIONS_MANAGER.full_img_list):
+                try: 
+                    self.create_full_package(package_file)
+                    UPDATE_LOGGER.print_log("Write full streaming update chunk complete!",
+                                            log_type=UPDATE_LOGGER.INFO_LOG)
+                           
+                except IOError:
+                    UPDATE_LOGGER.print_log("Add Chunk data info failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
+                    return False
+                
+        UPDATE_LOGGER.print_log("Write update package complete", log_type=UPDATE_LOGGER.INFO_LOG)
         return True
+    
+    def write_component_list(self, package_file):
+        """
+        Write components to the package file.
+
+        :param package_file: The file object to write components to.
+        :return: Boolean indicating success or failure.
+        """
+        for i in range(0, self.head_list.entry_count):
+            if not self.write_component(self.component_list[i], package_file):
+                UPDATE_LOGGER.print_log("write component failed: %s"
+                                        % self.component_list[i].component_addr, 
+                                        UPDATE_LOGGER.ERROR_LOG)
+                return False
+        return True
+        
+    def create_incremental_package(self, package_file):
+        """
+        Create the incremental update.bin file
+        return: incremental update package creation result
+        """
+        chunk_check_data = CreateChunk(1, 1)    
+        # Adding chunk list of pkg chunks
+        # Determine if a no_map file exists
+        if OPTIONS_MANAGER.no_map_image_exist:
+            UPDATE_LOGGER.print_log("OPTIONS_MANAGER.no_map_file_list:%s" % OPTIONS_MANAGER.no_map_file_list,
+                                    log_type=UPDATE_LOGGER.INFO_LOG)
+            self.chunk_data_offset = self.chunk_info_offset
+            # Add the no map mirror chunk command
+            for each_image in OPTIONS_MANAGER.no_map_file_list:
+                self.chunk_data_offset = chunk_check_data.write_chunklist_full_image(each_image, package_file,
+                                                            OPTIONS_MANAGER.image_chunk[each_image],
+                                                            OPTIONS_MANAGER.image_block_sets[each_image],
+                                                            self.chunk_data_offset)
+                UPDATE_LOGGER.print_log("write pkg no map chunk partition name is %s" % each_image,
+                                        log_type=UPDATE_LOGGER.INFO_LOG)
+        else:
+            self.chunk_data_offset = self.chunk_info_offset
+            
+        # Remove no map file list element
+        reduce_no_map_list = [item for item in OPTIONS_MANAGER.incremental_img_list 
+                                if item not in OPTIONS_MANAGER.no_map_file_list]
+        for each_image in reduce_no_map_list:
+            print(f'each_image_name:{each_image}')
+            UPDATE_LOGGER.print_log("write pkg chunk partition name is %s" % each_image, log_type=UPDATE_LOGGER.INFO_LOG)
+            self.chunk_data_offset = chunk_check_data.write_chunklist(each_image, package_file, self.chunk_data_offset)
+        self.chunk_hash_offset = self.chunk_data_offset
+        
+        # Record where the hash starts writing
+        self.hash_write_start_offset = self.chunk_hash_offset
+        
+        # Add the hash info header
+        image_number = len(OPTIONS_MANAGER.incremental_img_list)
+        self.chunk_hash_offset = chunk_check_data.write_hash_info(image_number, package_file, self.chunk_hash_offset)
+        
+        # Add hash for each image and the large data
+        for each_image in OPTIONS_MANAGER.incremental_img_list:
+            self.chunk_hash_offset = chunk_check_data.write_image_hashdata(each_image, package_file, self.chunk_hash_offset)
+            UPDATE_LOGGER.print_log("write image hashdata complete!", log_type=UPDATE_LOGGER.INFO_LOG)
+            self.chunk_hash_offset = chunk_check_data.write_image_large(each_image, package_file, self.chunk_hash_offset)
+            UPDATE_LOGGER.print_log("write image large complete!", log_type=UPDATE_LOGGER.INFO_LOG)
+        self.chunk_sign_offset = self.chunk_hash_offset
+        
+        # Record the location of the end-of-hash write
+        self.hash_write_end_offset = self.chunk_sign_offset
+        
+        # Add the sign of the encapsulated hash for all images
+        self.sign_all_imgae_hash(SIGN_ALGO_RSA, chunk_check_data, package_file)
+        
+    def create_full_package(self, package_file):
+        """
+        Create the full update.bin file
+        return: full update package creation result
+        """
+        chunk_check_data = CreateChunk(1, 1)
+        # Adding chunk list of pkg chunks
+        for each_img_name in OPTIONS_MANAGER.full_img_name_list:
+            each_img = each_img_name[:-4]
+            self.chunk_info_offset = chunk_check_data.write_chunklist_full_image(each_img, package_file, 
+                                                                                    OPTIONS_MANAGER.full_chunk[each_img],
+                                                                                    OPTIONS_MANAGER.full_block_sets[each_img],
+                                                                                    self.chunk_info_offset)
+            UPDATE_LOGGER.print_log("Write full streaming update [%s] chunk complete!" % each_img, 
+                                    log_type=UPDATE_LOGGER.INFO_LOG)   
+        self.chunk_hash_offset = self.chunk_info_offset          
+        
+        # Record where the hash starts writing
+        self.hash_write_start_offset = self.chunk_hash_offset
+        
+        # Add the hash info header
+        image_number = len(OPTIONS_MANAGER.full_img_name_list)
+        self.chunk_hash_offset = chunk_check_data.write_hash_info(image_number, package_file, self.chunk_hash_offset)
+            
+        # Add hash for each image and the large data
+        for each_image_name in OPTIONS_MANAGER.full_img_name_list:
+            each_img = os.path.splitext(each_image_name)[0]
+            self.chunk_hash_offset = chunk_check_data.write_image_hashdata(each_img, package_file, self.chunk_hash_offset)
+            UPDATE_LOGGER.print_log("write image hashdata complete!", log_type=UPDATE_LOGGER.INFO_LOG)
+            self.chunk_hash_offset = chunk_check_data.write_image_large(each_img, package_file, self.chunk_hash_offset)
+            UPDATE_LOGGER.print_log("write image large complete!", log_type=UPDATE_LOGGER.INFO_LOG)
+        self.chunk_sign_offset = self.chunk_hash_offset
+        
+        # Record the location of the end-of-hash write
+        self.hash_write_end_offset = self.chunk_sign_offset
+        
+        # Add the sign of the encapsulated hash for all images
+        self.sign_all_imgae_hash(SIGN_ALGO_RSA, chunk_check_data, package_file)

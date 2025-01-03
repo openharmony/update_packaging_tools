@@ -26,6 +26,7 @@ from blocks_manager import BlocksManager
 from log_exception import UPDATE_LOGGER
 from utils import FILE_MAP_ZERO_KEY
 from utils import FILE_MAP_COPY_KEY
+from utils import OptionsManager
 
 VERSION_NAME_RE = r"[0-9]+"
 REPLACE_CONTENT = "#"
@@ -36,6 +37,8 @@ class ActionType(Enum):
     ZERO = 1
     DIFFERENT = 2
     MOVE = 3
+
+OPTIONS_MANAGER = OptionsManager()
 
 
 class ActionInfo:
@@ -74,7 +77,8 @@ class TransfersManager(object):
         self.disable_img_diff = disable_img_diff
 
         self.action_file_list = []
-
+        self.no_copy_list = []
+        
     @staticmethod
     def simplify_file_name(file_name):
         base_name = os.path.basename(file_name)
@@ -106,12 +110,16 @@ class TransfersManager(object):
                         ActionType.ZERO, tgt_file_name, FILE_MAP_ZERO_KEY,
                         tgt_blocks, self.src_img_obj.
                         file_map.get(FILE_MAP_ZERO_KEY, None)))
+                if OPTIONS_MANAGER.stream_update:
+                    self.no_copy_list.append(tgt_blocks)
                 continue
             if FILE_MAP_COPY_KEY == tgt_file_name:
                 UPDATE_LOGGER.print_log("Apply COPY type!")
                 self.action_file_list.append(
                     ActionInfo(ActionType.NEW, tgt_file_name,
                                None, tgt_blocks, None))
+                if OPTIONS_MANAGER.stream_update:
+                    self.no_copy_list.append(tgt_blocks)
                 continue
             if tgt_file_name in self.src_img_obj.file_map:
                 UPDATE_LOGGER.print_log("Apply DIFF type!")
@@ -123,24 +131,34 @@ class TransfersManager(object):
                     if action_info.get_max_block_number() > \
                     max_size else max_size
                 self.action_file_list.append(action_info)
+                if OPTIONS_MANAGER.stream_update:
+                    self.no_copy_list.append(tgt_blocks)
                 continue
             src_file_name = self.get_file_name(
                 src_base_names, src_version_patterns, tgt_file_name)
             if src_file_name:
-                action_info = ActionInfo(
-                    ActionType.DIFFERENT, tgt_file_name, src_file_name,
-                    tgt_blocks,
-                    self.src_img_obj.file_map[src_file_name])
-                max_size = action_info.get_max_block_number() if \
-                    action_info.get_max_block_number() > max_size else max_size
-                self.action_file_list.append(action_info)
+                max_size = self.process_diff_action(src_file_name, tgt_blocks, max_size, tgt_file_name)
                 continue
             self.action_file_list.append(
                 ActionInfo(ActionType.NEW, tgt_file_name,
                            None, tgt_blocks, None))
+            if OPTIONS_MANAGER.stream_update:
+                self.no_copy_list.append(tgt_blocks)
 
         return max_size
-
+    
+    def process_diff_action(self, src_file_name, tgt_blocks, max_size, tgt_file_name=None):
+        action_info = ActionInfo(
+            ActionType.DIFFERENT, tgt_file_name, src_file_name,
+            tgt_blocks,
+            self.src_img_obj.file_map[src_file_name])
+        max_size = action_info.get_max_block_number() if \
+            action_info.get_max_block_number() > max_size else max_size
+        self.action_file_list.append(action_info)
+        if OPTIONS_MANAGER.stream_update:
+            self.no_copy_list.append(tgt_blocks)
+        return max_size 
+    
     def get_file_name(self, src_base_names, src_version_patterns,
                       tgt_file_name):
         tgt_base_name, tgt_version_patterns = \
@@ -156,3 +174,7 @@ class TransfersManager(object):
 
     def get_action_list(self):
         return self.action_file_list
+    
+    # 返回所有action_list中涉及的块
+    def get_no_copy_list(self):
+        return self.no_copy_list

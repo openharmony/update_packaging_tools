@@ -72,6 +72,9 @@ class FullUpdateImage:
             each_img.seek(0)
             full_image_content_len_list.append(len(full_image_content))
             full_image_file_obj_list.append(each_img)
+            # 全量流式升级处理
+            OPTIONS_MANAGER.full_image_new_data[each_name] = full_image_content
+            
             UPDATE_LOGGER.print_log(
                 "Image %s full processing completed" % img_name)
         update_image_set = set(self.full_img_list) - FORBIDEN_UPDATE_IMAGE_SET
