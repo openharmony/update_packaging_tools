@@ -209,7 +209,7 @@ class PatchPackageChunk:
                 start_blocks = original_start_blocks
         
                 # 在当前位置插入两个新的blocks
-                subblocks_list[i : i + 1] = [block_one, block_two]
+                subblocks_list[i: i + 1] = [block_one, block_two]
                 print(f'Inserted two new blocks: {block_one, block_two}')
                 print(f'Current subblocks_list: {subblocks_list}')
                 continue  # 跳出这次循环，重新处理新分解的块
