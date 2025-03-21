@@ -143,7 +143,10 @@ class BaseOptionsManager:
         self.signing_length = 256
         self.xml_path = None
         self.sd_card = False
-
+        self.stream_update = False
+        self.chunk_limit = 11       # chunk size 11 * 4096 = 44KB
+        self.ab_partition_update = False
+        
         self.make_dir_path = None
 
 
@@ -192,6 +195,12 @@ class OptionsManager(BaseOptionsManager):
         # Full processing parameters
         self.full_image_content_len_list = []
         self.full_image_file_obj_list = []
+        # 全量流式升级
+        self.full_image_new_data = {}
+        self.full_chunk = {}
+        self.full_block_sets = {}
+        # 存放所有chunk
+        self.full_image_chunk_list = []
 
         # Incremental processing parameters
         self.incremental_content_len_list = []
@@ -200,6 +209,22 @@ class OptionsManager(BaseOptionsManager):
         self.incremental_temp_file_obj_list = []
         self.max_stash_size = 0
 
+        # 差分流式升级
+        # 定义一个transfer_list来存放image.transfer.list内容
+        self.image_transfer_dict_contents = {}
+        self.image_patch_dic = {}
+        self.image_new_dic = {}
+        self.diff_image_new_data = {}
+        # 存放镜像所有数据，以blcok为单位
+        self.all_blocks_data = {}
+        self.len_block = 0 
+        
+        # no map 文件
+        self.image_chunk = {}
+        self.image_block_sets = {}
+        self.no_map_file_list = []
+        self.no_map_image_exist = False
+        
         # Script parameters
         self.opera_script_file_name_dict = {}
         for each in SCRIPT_KEY_LIST:
@@ -456,6 +481,9 @@ def clear_options():
     OPTIONS_MANAGER.signing_length = 256
     OPTIONS_MANAGER.xml_path = None
     OPTIONS_MANAGER.sd_card = False
+
+    OPTIONS_MANAGER.stream_update = False
+    OPTIONS_MANAGER.chunk_limit = 11
 
     OPTIONS_MANAGER.full_image_path_list = []
 

@@ -33,7 +33,6 @@ class GigraphProcess(object):
         self.data_size = DATA_SIZE
 
         self.generate_digraph()
-        self.stash_process()
 
     def generate_digraph(self):
         """

@@ -106,7 +106,11 @@ def create_update_bin():
     head_value_list = OPTIONS_MANAGER.head_info_list
     component_dict = OPTIONS_MANAGER.component_info_dict
     full_image_file_obj_list = OPTIONS_MANAGER.full_image_file_obj_list
-    full_img_list = OPTIONS_MANAGER.full_img_list
+    if OPTIONS_MANAGER.stream_update:
+        # List of chunks stored in full streaming update
+        full_img_list = OPTIONS_MANAGER.full_image_chunk_list
+    else:     
+        full_img_list = OPTIONS_MANAGER.full_img_list
 
     extend_component_list = get_extend_path_list()
     if not OPTIONS_MANAGER.not_l2:
