@@ -50,6 +50,7 @@ COMPONENT_DIGEST_SIZE = 32
 BLOCK_SIZE = 8192
 HEADER_TLV_TYPE = 0x11
 HEADER_TLV_TYPE_L2 = 0x01
+ZIP_TLV_TYPE = 0xaa
 # signature algorithm
 SIGN_ALGO_RSA = "SHA256withRSA"
 SIGN_ALGO_PSS = "SHA256withPSS"
@@ -110,8 +111,35 @@ class CreatePackage(object):
             UPDATE_LOGGER.print_log("Invalid param", UPDATE_LOGGER.ERROR_LOG)
             return False
         return True
+    
+    def write_update_zip(self, package_file):
+        try:
+            build_tools_zip_path = OPTIONS_MANAGER.signed_package
+            UPDATE_LOGGER.print_log("build_tools_zip_path = %s" % build_tools_zip_path, UPDATE_LOGGER.ERROR_LOG)
+            with open(build_tools_zip_path, 'rb') as f:
+                value_data = f.read()
+            value_length = len(value_data)
+            tlv_header = struct.pack('<HI', ZIP_TLV_TYPE, value_length)
+            package_file.write(tlv_header)  # 写入Type和Length
+            package_file.write(value_data)  # 写入Value
 
-    def write_pkginfo(self, package_file):
+            UPDATE_LOGGER.print_log(
+            f"Successfully wrote build_tools.zip (Type={ZIP_TLV_TYPE}, Length={value_length} bytes)",
+            UPDATE_LOGGER.INFO_LOG
+            )
+            
+            offset = len(tlv_header) + len(value_data)
+        
+        except Exception as e:
+            UPDATE_LOGGER.print_log(
+                f"Failed to write build_tools.zip: {str(e)}",
+                UPDATE_LOGGER.ERROR_LOG
+            )
+            raise RuntimeError
+        
+        return offset
+        
+    def write_pkginfo(self, package_file, offset):
         try:
             # Type is 1 for package header in TLV format
             header_tlv = struct.pack(TLV_FMT, self.header_tlv_type, UPGRADE_PKG_HEADER_SIZE)
@@ -138,6 +166,7 @@ class CreatePackage(object):
         # write pkginfo
         pkginfo = header_tlv + upgrade_pkg_header + time_tlv + upgrade_pkg_time + component_tlv
         try:
+            package_file.seek(offset)
             package_file.write(pkginfo)
         except IOError:
             UPDATE_LOGGER.print_log("write fail!", log_type=UPDATE_LOGGER.ERROR_LOG)
@@ -213,8 +242,7 @@ class CreatePackage(object):
     def calculate_header_hash(self, package_file):
         hash_sha256 = hashlib.sha256()
         remain_len = self.hash_info_offset
-
-        package_file.seek(0)
+        package_file.seek(OPTIONS_MANAGER.zip_offset)
         while remain_len > BLOCK_SIZE:
             hash_sha256.update(package_file.read(BLOCK_SIZE))
             remain_len -= BLOCK_SIZE
@@ -380,14 +408,24 @@ class CreatePackage(object):
 
         hash_check_data = CreateHash(HashType.SHA256, self.head_list.entry_count)
         hash_check_data.write_hashinfo()
+        UPDATE_LOGGER.print_log("self.save_path: %s"
+                        % self.save_path, UPDATE_LOGGER.INFO_LOG)
         package_fd = os.open(self.save_path, os.O_RDWR | os.O_CREAT, 0o755)
         with os.fdopen(package_fd, "wb+") as package_file:
+            # 如果为流式升级，将build_tools_zip嵌入到update_bin
+            if OPTIONS_MANAGER.stream_update:
+                zip_file_offset = self.write_update_zip(package_file)
+            else:
+                zip_file_offset = 0     
+            OPTIONS_MANAGER.zip_offset = zip_file_offset
             # Add information to package
-            if not self.write_pkginfo(package_file):
+            if not self.write_pkginfo(package_file, zip_file_offset):
                 UPDATE_LOGGER.print_log("Write pkginfo failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
                 return False
             # Add component to package
-            self.compinfo_offset = UPGRADE_FILE_HEADER_LEN
+            self.compinfo_offset = UPGRADE_FILE_HEADER_LEN + zip_file_offset
+            UPDATE_LOGGER.print_log("self.compinfo_offset: %s"
+                        % self.compinfo_offset, UPDATE_LOGGER.INFO_LOG)
             self.component_offset = UPGRADE_FILE_HEADER_LEN + \
                 self.head_list.entry_count * self.upgrade_compinfo_size + \
                 UPGRADE_RESERVE_LEN + SIGN_SHA256_LEN + SIGN_SHA384_LEN

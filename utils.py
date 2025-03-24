@@ -215,6 +215,9 @@ class OptionsManager(BaseOptionsManager):
         self.image_patch_dic = {}
         self.image_new_dic = {}
         self.diff_image_new_data = {}
+        # 差分流式本地升级
+        self.zip_offset = 0
+        
         # 存放镜像所有数据，以blcok为单位
         self.all_blocks_data = {}
         self.len_block = 0 
@@ -238,8 +241,7 @@ class OptionsManager(BaseOptionsManager):
         self.build_tools_zip_obj = None
         self.update_package_file_path = None
         self.signed_package = None
-
-
+        
 OPTIONS_MANAGER = OptionsManager()
 
 

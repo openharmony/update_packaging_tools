@@ -688,9 +688,10 @@ class PackagePatchZip:
         self.new_dat_file_obj.flush()
         self.patch_dat_file_obj.flush()
         self.transfer_list_file_obj.flush()
-        # add new.dat to ota.zip
-        zip_file.write(self.new_dat_file_obj.name, self.partition_new_dat_file_name)
-        # add patch.dat to ota.zip
-        zip_file.write(self.patch_dat_file_obj.name, self.partition_patch_dat_file_name)
-        # add transfer.list to ota.zip
-        zip_file.write(self.transfer_list_file_obj.name, self.partition_transfer_file_name)
+        if not OPTIONS_MANAGER.stream_update:
+            # add new.dat to ota.zip
+            zip_file.write(self.new_dat_file_obj.name, self.partition_new_dat_file_name)
+            # add patch.dat to ota.zip
+            zip_file.write(self.patch_dat_file_obj.name, self.partition_patch_dat_file_name)
+            # add transfer.list to ota.zip
+            zip_file.write(self.transfer_list_file_obj.name, self.partition_transfer_file_name)
