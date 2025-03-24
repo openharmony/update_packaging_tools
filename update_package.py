@@ -444,6 +444,7 @@ def do_zip_update_package():
     zip_file.close()
     return True
 
+
 def do_zip_update_bin_package():
     zip_file = zipfile.ZipFile(OPTIONS_MANAGER.update_package_file_path,
                                'w', zipfile.ZIP_DEFLATED, allowZip64=True)
@@ -477,6 +478,7 @@ def do_zip_update_bin_package():
 
     zip_file.close()
     return True
+
 
 def create_hsd_for_build_tools(zip_file, files_to_sign):
     """
@@ -550,14 +552,16 @@ def build_update_package(no_zip, update_package, prelude_script,
                 OPTIONS_MANAGER.update_bin_obj = update_bin_obj
             else:
                 return False
-            if not do_zip_update_package():
+            
+            if not do_zip_update_bin_package():
                 UPDATE_LOGGER.print_log("Zip update package fail", UPDATE_LOGGER.ERROR_LOG)
                 return False
+        
             sign_result = do_sign_package(update_package, update_file_name)
             if not sign_result:
                 UPDATE_LOGGER.print_log("Sign ota package fail", UPDATE_LOGGER.ERROR_LOG)
                 return False
-            UPDATE_LOGGER.print_log("create_update_bin successful %s" % update_package_path, UPDATE_LOGGER.ERROR_LOG)
+            UPDATE_LOGGER.print_log("create_update_bin successful %s" % update_package_path, UPDATE_LOGGER.INFO_LOG)
 
         if os.path.exists(update_package_path):
             os.remove(update_package_path)

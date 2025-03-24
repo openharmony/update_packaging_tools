@@ -120,9 +120,8 @@ class CreatePackage(object):
                 value_data = f.read()
             value_length = len(value_data)
             tlv_header = struct.pack('<HI', ZIP_TLV_TYPE, value_length)
-            package_file.write(tlv_header)  # 写入Type和Length
-            package_file.write(value_data)  # 写入Value
-
+            package_file.write(tlv_header)
+            package_file.write(value_data)
             UPDATE_LOGGER.print_log(
             f"Successfully wrote build_tools.zip (Type={ZIP_TLV_TYPE}, Length={value_length} bytes)",
             UPDATE_LOGGER.INFO_LOG
@@ -412,7 +411,7 @@ class CreatePackage(object):
                         % self.save_path, UPDATE_LOGGER.INFO_LOG)
         package_fd = os.open(self.save_path, os.O_RDWR | os.O_CREAT, 0o755)
         with os.fdopen(package_fd, "wb+") as package_file:
-            # 如果为流式升级，将build_tools_zip嵌入到update_bin
+            # 如果为流式升级，将zip嵌入到update_bin
             if OPTIONS_MANAGER.stream_update:
                 zip_file_offset = self.write_update_zip(package_file)
             else:
@@ -489,7 +488,6 @@ class CreatePackage(object):
                     UPDATE_LOGGER.print_log("Add Chunk data info failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
                     return False
                 
-        UPDATE_LOGGER.print_log("Write update package complete", log_type=UPDATE_LOGGER.INFO_LOG)
         return True
     
     def write_component_list(self, package_file):
