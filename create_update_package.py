@@ -358,7 +358,6 @@ class CreatePackage(object):
             hash_sha256.update(package_file.read(remain_len))
         return hash_sha256.digest()
     
-    
     def sign_all_imgae_hash(self, sign_algo, hash_check_data, package_file):
         """
         Sign the hash of all images using the specified signing algorithm.
@@ -396,6 +395,31 @@ class CreatePackage(object):
             ".bin package header signing success! SignOffset: %s" % self.chunk_sign_offset)
         return True
     
+    def handle_stream_update(self, package_file):
+        # Incremental streaming update
+        if OPTIONS_MANAGER.stream_update and OPTIONS_MANAGER.incremental_img_list:
+            try: 
+                self.create_incremental_package(package_file)
+                UPDATE_LOGGER.print_log("Write incremental streaming update chunk complete!",
+                                        log_type=UPDATE_LOGGER.INFO_LOG)
+                    
+            except IOError:
+                UPDATE_LOGGER.print_log("Add Chunk data info failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
+                return False
+            
+        # Full streaming update
+        if OPTIONS_MANAGER.stream_update and len(OPTIONS_MANAGER.full_img_list):
+            try: 
+                self.create_full_package(package_file)
+                UPDATE_LOGGER.print_log("Write full streaming update chunk complete!",
+                                        log_type=UPDATE_LOGGER.INFO_LOG)
+                    
+            except IOError:
+                UPDATE_LOGGER.print_log("Add Chunk data info failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
+                return False
+            
+        return True
+        
     def create_package(self):
         """
         Create the update.bin file
@@ -466,28 +490,10 @@ class CreatePackage(object):
                     return False
             self.chunk_info_offset = self.component_offset  
             
-            # Incremental streaming update
-            if OPTIONS_MANAGER.stream_update and OPTIONS_MANAGER.incremental_img_list:
-                try: 
-                    self.create_incremental_package(package_file)
-                    UPDATE_LOGGER.print_log("Write incremental streaming update chunk complete!",
-                                            log_type=UPDATE_LOGGER.INFO_LOG)
-                        
-                except IOError:
-                    UPDATE_LOGGER.print_log("Add Chunk data info failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
-                    return False
-                
-            # Full streaming update
-            if OPTIONS_MANAGER.stream_update and len(OPTIONS_MANAGER.full_img_list):
-                try: 
-                    self.create_full_package(package_file)
-                    UPDATE_LOGGER.print_log("Write full streaming update chunk complete!",
-                                            log_type=UPDATE_LOGGER.INFO_LOG)
-                           
-                except IOError:
-                    UPDATE_LOGGER.print_log("Add Chunk data info failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
-                    return False
-                
+            if not self.handle_stream_update(package_file):
+                UPDATE_LOGGER.print_log("Handle stream update failed!", log_type=UPDATE_LOGGER.ERROR_LOG)
+                return False
+            
         return True
     
     def write_component_list(self, package_file):
