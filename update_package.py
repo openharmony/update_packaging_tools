@@ -131,6 +131,7 @@ def create_update_bin():
         full_image_file_obj_list, component_dict)
 
     save_patch = update_bin_obj.name.encode("utf-8")
+    
     if OPTIONS_MANAGER.private_key == ON_SERVER:
         private_key = "./update_package.py"
     else:
@@ -418,6 +419,42 @@ def do_zip_update_package():
         zip_file.close()
         return False
     # add update.bin to update package
+    if not OPTIONS_MANAGER.stream_update:
+        zip_file.write(OPTIONS_MANAGER.update_bin_obj.name, "update.bin")
+    # add build_tools.zip to update package
+    zip_file.write(OPTIONS_MANAGER.build_tools_zip_obj.name, BUILD_TOOLS_FILE_NAME)
+
+    zip_file.write(OPTIONS_MANAGER.board_list_file_path, "board_list")
+    decouple_res = OPTIONS_MANAGER.init.invoke_event(DECOUPLED_EVENT)
+    if decouple_res is False:
+        zip_file.write(OPTIONS_MANAGER.version_mbn_file_path, "version_list")
+
+    if OPTIONS_MANAGER.max_stash_size != 0:
+        max_stash_file_obj = tempfile.NamedTemporaryFile(mode="w+")
+        max_stash_file_obj.write(str(OPTIONS_MANAGER.max_stash_size))
+        max_stash_file_obj.flush()
+        zip_file.write(max_stash_file_obj.name, "all_max_stash")
+
+    for package_patch_zip in OPTIONS_MANAGER.incremental_block_file_obj_dict.values():
+        package_patch_zip.package_block_patch(zip_file)
+
+    for partition, patch_obj in OPTIONS_MANAGER.incremental_image_file_obj_dict.items():
+        zip_file.write(patch_obj.name, "%s.patch.dat" % partition)
+
+    zip_file.close()
+    return True
+
+
+def do_zip_update_bin_package():
+    zip_file = zipfile.ZipFile(OPTIONS_MANAGER.update_package_file_path,
+                               'w', zipfile.ZIP_DEFLATED, allowZip64=True)
+    # add files to update package
+    do_add_files = OPTIONS_MANAGER.init.invoke_event(ZIP_EVENT)
+    if callable(do_add_files) and do_add_files(zip_file) is False:
+        UPDATE_LOGGER.print_log("add files fail", UPDATE_LOGGER.ERROR_LOG)
+        zip_file.close()
+        return False
+    # add update.bin to update package
     zip_file.write(OPTIONS_MANAGER.update_bin_obj.name, "update.bin")
     # add build_tools.zip to update package
     zip_file.write(OPTIONS_MANAGER.build_tools_zip_obj.name, BUILD_TOOLS_FILE_NAME)
@@ -474,11 +511,12 @@ def build_update_package(no_zip, update_package, prelude_script,
     :param ending_script: ending object
     :return: If exception occurs, return False.
     """
-    update_bin_obj = create_update_bin()
-    if update_bin_obj:
-        OPTIONS_MANAGER.update_bin_obj = update_bin_obj
-    else:
-        return False
+    if not OPTIONS_MANAGER.stream_update:
+        update_bin_obj = create_update_bin()
+        if update_bin_obj:
+            OPTIONS_MANAGER.update_bin_obj = update_bin_obj
+        else:
+            return False
 
     update_file_name = get_update_file_name()
 
@@ -497,18 +535,37 @@ def build_update_package(no_zip, update_package, prelude_script,
                 log_type=UPDATE_LOGGER.ERROR_LOG)
             return False
         OPTIONS_MANAGER.build_tools_zip_obj = build_tools_zip_obj
-
+        
         if not do_zip_update_package():
             UPDATE_LOGGER.print_log("Zip update package fail", UPDATE_LOGGER.ERROR_LOG)
             return False
 
         sign_result = do_sign_package(update_package, update_file_name)
-
         if not sign_result:
             UPDATE_LOGGER.print_log("Sign ota package fail", UPDATE_LOGGER.ERROR_LOG)
             return False
+        
+        # 生成update_bin文件,流式本地升级
+        if OPTIONS_MANAGER.stream_update:
+            update_bin_obj = create_update_bin()
+            if update_bin_obj:
+                OPTIONS_MANAGER.update_bin_obj = update_bin_obj
+            else:
+                return False
+            
+            if not do_zip_update_bin_package():
+                UPDATE_LOGGER.print_log("Zip update package fail", UPDATE_LOGGER.ERROR_LOG)
+                return False
+        
+            sign_result = do_sign_package(update_package, update_file_name)
+            if not sign_result:
+                UPDATE_LOGGER.print_log("Sign ota package fail", UPDATE_LOGGER.ERROR_LOG)
+                return False
+            UPDATE_LOGGER.print_log("create_update_bin successful %s" % update_package_path, UPDATE_LOGGER.INFO_LOG)
+
         if os.path.exists(update_package_path):
             os.remove(update_package_path)
+            
     else:
         update_package_path = os.path.join(
             update_package, '%s.bin' % update_file_name)
