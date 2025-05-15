@@ -139,7 +139,6 @@ class PatchProcess:
         OPTIONS_MANAGER.len_block += len(new_data)
         print(f'new_data: {len(new_data)}')
         print(f'total blcok length: {OPTIONS_MANAGER.len_block}')
-        self.chunk_new_list.append(new_data)
         return new_data
     
     @staticmethod
