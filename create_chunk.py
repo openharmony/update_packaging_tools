@@ -329,11 +329,12 @@ class CreateChunk(object):
                     data_tlv = struct.pack(CHUNK_DATA_DATA_FMT, 
                                             self.chunkdata_value_tlv_type, 
                                             len(data_value)) + data_value.encode('utf-8')
-                    patch_index += 1 
-                data_tlv = struct.pack(CHUNK_DATA_DATA_FMT, 
-                                        self.chunkdata_value_tlv_type, 
-                                        len(data_value)) + data_value
-                patch_index += 1
+                    patch_index += 1
+                else:
+                    data_tlv = struct.pack(CHUNK_DATA_DATA_FMT, 
+                                            self.chunkdata_value_tlv_type, 
+                                            len(data_value)) + data_value
+                    patch_index += 1
             else:
                 data_value = chunk
                 UPDATE_LOGGER.print_log("patch.data is empty!", log_type=UPDATE_LOGGER.ERROR_LOG)
@@ -350,10 +351,11 @@ class CreateChunk(object):
                                             self.chunkdata_value_tlv_type, 
                                             len(data_value)) + data_value.encode('utf-8')
                     new_index += 1
-                data_tlv = struct.pack(CHUNK_DATA_DATA_FMT, 
-                                        self.chunkdata_value_tlv_type, 
-                                        len(data_value)) + data_value
-                new_index += 1
+                else:
+                    data_tlv = struct.pack(CHUNK_DATA_DATA_FMT, 
+                                            self.chunkdata_value_tlv_type, 
+                                            len(data_value)) + data_value
+                    new_index += 1
             else: 
                 data_value = chunk 
                 UPDATE_LOGGER.print_log("new.data is empty!", log_type=UPDATE_LOGGER.ERROR_LOG)
