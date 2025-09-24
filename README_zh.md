@@ -18,7 +18,7 @@
 
 - 变分区升级包：升级包中包括分区表、镜像全量数据，用于变分区处理和变分区后的镜像恢复。
 
-更多升级子系统相关概念，请参考：[升级子系统](https://gitee.com/openharmony/docs/blob/master/zh-cn/readme/%E5%8D%87%E7%BA%A7%E5%AD%90%E7%B3%BB%E7%BB%9F.md)
+更多升级子系统相关概念，请参考：[升级子系统](https://gitcode.com/openharmony/docs/blob/master/zh-cn/readme/%E5%8D%87%E7%BA%A7%E5%AD%90%E7%B3%BB%E7%BB%9F.md)
 
 ## 目录<a name="section191mcpsimp"></a>
 
@@ -91,7 +91,7 @@ python build_update.py -s source.zip ./target/ ./target/package -pk./target/upda
 
 ## 相关仓<a name="section247mcpsimp"></a>
 
-[升级子系统](https://gitee.com/openharmony/docs/blob/master/zh-cn/readme/%E5%8D%87%E7%BA%A7%E5%AD%90%E7%B3%BB%E7%BB%9F.md)
+[升级子系统](https://gitcode.com/openharmony/docs/blob/master/zh-cn/readme/%E5%8D%87%E7%BA%A7%E5%AD%90%E7%B3%BB%E7%BB%9F.md)
 
-[**update\_packaging\_tools**](https://gitee.com/openharmony/update_packaging_tools)
+[**update\_packaging\_tools**](https://gitcode.com/openharmony/update_packaging_tools)
 
